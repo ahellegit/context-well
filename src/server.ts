@@ -5,6 +5,9 @@ import fastifyStatic from "@fastify/static";
 import fastifyCookie from "@fastify/cookie";
 import fastifyRateLimit from "@fastify/rate-limit";
 import { config } from "./config.js";
+import authRoutes from "./auth/routes.js";
+import { registerAuthGuard } from "./auth/guard.js";
+import settingsRoutes from "./settings/routes.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // public/ holds the rewired prototype frontend; in dist builds it sits two levels up.
@@ -19,9 +22,16 @@ export async function buildServer() {
   // Health check (used by docker-compose and U1 verification).
   app.get("/api/health", async () => ({ status: "ok" }));
 
-  // Feature routes are registered here as units land:
-  //   auth (U3), settings (U5), spaces (U6), connectors (U7), chat (U10)
-  // await app.register(authRoutes, { prefix: "/api/auth" });
+  // Public auth routes — register/login/logout/me handle their own session checks.
+  await app.register(authRoutes, { prefix: "/api/auth" });
+
+  // Protected scope: everything registered here requires a valid session (U3 guard).
+  // Future units register their plugins inside this scope: spaces (U6),
+  // connectors (U7), chat (U10).
+  await app.register(async (protectedScope) => {
+    registerAuthGuard(protectedScope);
+    await protectedScope.register(settingsRoutes); // U5 (absolute /api/settings paths)
+  });
 
   // Serve the static frontend last so /api/* takes precedence.
   await app.register(fastifyStatic, { root: publicDir, prefix: "/" });
