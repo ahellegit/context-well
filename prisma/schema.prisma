@@ -1,0 +1,118 @@
+// knowledgeLLM persistence (U2 / KTD2). SQLite for v1, datasource swappable.
+// A space's `slug` is its CyborgDB index name (namespace-as-slug). The
+// DocumentVector join table maps documents to vector IDs for correct
+// deletion and resync (R23). JSON-shaped fields are stored as TEXT and
+// (de)serialized in the app layer for SQLite portability.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String
+  createdAt    DateTime  @default(now())
+  sessions     Session[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model Space {
+  id                  String         @id @default(cuid())
+  slug                String         @unique
+  name                String
+  customPrompt        String         @default("")
+  // 32-byte CyborgDB index key, hex-encoded (KTD4). v1 stores it unencrypted (KTD5).
+  indexKey            String
+  embeddingModel      String         @default("all-MiniLM-L6-v2")
+  similarityThreshold Float          @default(0.35)
+  createdAt           DateTime       @default(now())
+  connectors          Connector[]
+  documents           Document[]
+  conversations       Conversation[]
+}
+
+model Connector {
+  id          String     @id @default(cuid())
+  spaceId     String
+  space       Space      @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  kind        String // "github" | "slack"
+  credentials String // token(s); v1 plaintext, never returned to the browser (R29)
+  targets     String     @default("[]") // JSON array of selected repos/channels
+  status      String     @default("idle") // idle|validating|auth_error|syncing|connected|partial|error
+  detail      String     @default("") // human summary / per-target results (JSON)
+  lastSyncAt  DateTime?
+  chunkCount  Int        @default(0)
+  documents   Document[]
+
+  @@index([spaceId])
+}
+
+model Document {
+  id          String           @id @default(cuid())
+  spaceId     String
+  space       Space            @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  connectorId String
+  connector   Connector        @relation(fields: [connectorId], references: [id], onDelete: Cascade)
+  externalRef String // stable source ref (repo path, issue ref, channel+ts)
+  title       String
+  metadata    String           @default("{}") // JSON
+  vectors     DocumentVector[]
+
+  @@index([spaceId])
+  @@index([connectorId])
+}
+
+model DocumentVector {
+  id         String   @id @default(cuid())
+  documentId String
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  vectorId   String // the chunk ID upserted into CyborgDB (KTD7)
+
+  @@index([documentId])
+  @@index([vectorId])
+}
+
+model Conversation {
+  id        String    @id @default(cuid())
+  spaceId   String
+  space     Space     @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  title     String    @default("New chat")
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  messages  Message[]
+
+  @@index([spaceId])
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role           String // "user" | "assistant"
+  text           String
+  // Full snapshot of cited source cards (R30): [{id,title,snippet,score,connector}]
+  sources        String       @default("[]")
+  createdAt      DateTime     @default(now())
+
+  @@index([conversationId])
+}
+
+model SystemSetting {
+  key   String @id
+  value String
+}
