@@ -1,0 +1,22 @@
+node_modules/
+dist/
+*.log
+
+# Secrets and local config (KTD5 / R29)
+.env
+.env.local
+
+# SQLite dev database
+*.db
+*.db-journal
+prisma/dev.db
+prisma/*.db
+
+# CyborgDB disk store (local dev)
+.cyborgdb-data/
+
+# Agent worktrees
+.claude/worktrees/
+
+# OS
+.DS_Store

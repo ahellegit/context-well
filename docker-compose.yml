@@ -1,0 +1,40 @@
+# knowledgeLLM stack (R21): the app + cyborgdb-service in standalone/disk mode.
+# Ollama is external (R22) — set its URL during in-app setup. Inside this
+# network, "localhost" is the container, so point Ollama at host.docker.internal
+# (Mac/Windows) or your host LAN IP. See .env.example.
+
+services:
+  app:
+    build: .
+    env_file: .env
+    environment:
+      # Reach cyborgdb-service over the compose network, not localhost.
+      CYBORGDB_URL: http://cyborgdb-service:8000
+      DATABASE_URL: file:/data/app.db
+    ports:
+      - "${PORT:-3000}:3000"
+    volumes:
+      - app_data:/data
+    depends_on:
+      cyborgdb-service:
+        condition: service_healthy
+
+  cyborgdb-service:
+    image: cyborginc/cyborgdb-service:latest
+    environment:
+      # The API key the app's SDK client authenticates with (maps to our
+      # CYBORGDB_API_KEY in .env).
+      CYBORGDB_SERVICE_ROOT_KEY: ${CYBORGDB_API_KEY}
+      # Standalone disk (RocksDB) backend — persisted in the volume below.
+      CYBORGDB_DB_TYPE: disk
+    volumes:
+      - cyborgdb_data:/app/cyborgdb_data
+    healthcheck:
+      test: ["CMD", "sh", "-c", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/v1/health')\""]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+volumes:
+  app_data:
+  cyborgdb_data:
