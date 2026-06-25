@@ -9,6 +9,8 @@ import authRoutes from "./auth/routes.js";
 import { registerAuthGuard } from "./auth/guard.js";
 import settingsRoutes from "./settings/routes.js";
 import spacesRoutes from "./spaces/routes.js";
+import connectorsRoutes from "./connectors/routes.js";
+import chatRoutes from "./chat/routes.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // public/ holds the rewired prototype frontend; in dist builds it sits two levels up.
@@ -33,6 +35,8 @@ export async function buildServer() {
     registerAuthGuard(protectedScope);
     await protectedScope.register(settingsRoutes); // U5 (absolute /api/settings paths)
     await protectedScope.register(spacesRoutes); // U6 (absolute /api/spaces paths)
+    await protectedScope.register(connectorsRoutes); // U7
+    await protectedScope.register(chatRoutes); // U10
   });
 
   // Serve the static frontend last so /api/* takes precedence.
