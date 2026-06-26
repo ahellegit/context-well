@@ -87,6 +87,7 @@ export default async function chatRoutes(app: FastifyInstance): Promise<void> {
               dropped: event.dropped,
               cards: event.cards,
               grounded: event.grounded,
+              timing: event.timing,
             });
             break;
         }

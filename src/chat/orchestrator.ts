@@ -69,6 +69,7 @@ export type TurnEvent =
   | { type: "token"; value: string }
   // Stream complete: validated citations + the persisted snapshot (R17/R30).
   // `grounded` is false for the general-chat fallback (cited/cards empty).
+  // `timing` is the per-phase breakdown (ms) for the UI's timing bar.
   | {
       type: "done";
       conversationId: string;
@@ -76,7 +77,16 @@ export type TurnEvent =
       dropped: number[];
       cards: SourceCard[];
       grounded: boolean;
+      timing: TurnTiming;
     };
+
+/** Per-phase latency of a chat turn (ms), surfaced to the UI. */
+export interface TurnTiming {
+  retrievalMs: number; // CyborgDB query (embed + search)
+  firstTokenMs: number; // query-done → first streamed token (Ollama prefill/queue)
+  genMs: number; // first token → last token (generation)
+  totalMs: number; // whole turn
+}
 
 export interface RunTurnInput {
   // Provide exactly one of conversationId (continue a thread) or spaceId (start
@@ -159,17 +169,20 @@ function toSpaceRef(space: {
 export async function* runTurn(
   input: RunTurnInput,
 ): AsyncGenerator<TurnEvent, void, unknown> {
+  const t0 = Date.now();
   const { conversationId, space, history } = await resolveTarget(input);
   const topK = input.topK ?? DEFAULT_TOP_K;
   const spaceRef = toSpaceRef(space);
 
   // 2. Retrieve. A failure here is R25 — never fall through to Ollama.
   let hits: CyborgHit[];
+  const qStart = Date.now();
   try {
     hits = await query(spaceRef, input.userText, topK);
   } catch (error) {
     throw new RetrievalError(error);
   }
+  const retrievalMs = Date.now() - qStart;
 
   // 3. Filter to usable hits (similarity >= per-space threshold, KTD8).
   const usable = hits.filter((h) => h.similarity >= space.similarityThreshold);
@@ -194,6 +207,8 @@ export async function* runTurn(
     });
 
     let answer = "";
+    const genStart = Date.now();
+    let firstAt = 0;
     for await (const token of streamChat({
       url: settings.ollamaUrl,
       model: settings.chatModel,
@@ -201,9 +216,11 @@ export async function* runTurn(
       numCtx: CHAT_NUM_CTX,
       signal: input.signal,
     })) {
+      if (!firstAt) firstAt = Date.now();
       answer += token;
       yield { type: "token", value: token };
     }
+    const end = Date.now();
 
     await appendMessage(conversationId, { role: "user", text: input.userText });
     await appendMessage(conversationId, {
@@ -218,6 +235,12 @@ export async function* runTurn(
       dropped: [],
       cards: [],
       grounded: false,
+      timing: {
+        retrievalMs,
+        firstTokenMs: (firstAt || end) - genStart,
+        genMs: firstAt ? end - firstAt : 0,
+        totalMs: end - t0,
+      },
     };
     return;
   }
@@ -240,6 +263,8 @@ export async function* runTurn(
   // validation. A mid-stream abort throws out of the generator before any
   // persistence (R27: no partial persisted).
   let answer = "";
+  const genStart = Date.now();
+  let firstAt = 0;
   for await (const token of streamChat({
     url: settings.ollamaUrl,
     model: settings.chatModel,
@@ -247,9 +272,11 @@ export async function* runTurn(
     numCtx: CHAT_NUM_CTX,
     signal: input.signal,
   })) {
+    if (!firstAt) firstAt = Date.now();
     answer += token;
     yield { type: "token", value: token };
   }
+  const end = Date.now();
 
   // 5. Validate citations against the usable set and persist (R17/R30).
   const { citedNumbers, citedCards, droppedNumbers } = validateCitations(
@@ -271,5 +298,11 @@ export async function* runTurn(
     dropped: droppedNumbers,
     cards: citedCards,
     grounded: true,
+    timing: {
+      retrievalMs,
+      firstTokenMs: (firstAt || end) - genStart,
+      genMs: firstAt ? end - firstAt : 0,
+      totalMs: end - t0,
+    },
   };
 }
