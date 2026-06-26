@@ -476,6 +476,10 @@ export async function* streamChat(
     model: opts.model,
     messages: opts.messages,
     stream: true,
+    // Disable chain-of-thought for reasoning models (e.g. qwen3.x): the hidden
+    // "thinking" pass adds ~10x latency before the first visible token. We want
+    // a fast, direct answer. Models without thinking ignore this flag.
+    think: false,
     ...(opts.numCtx ? { options: { num_ctx: opts.numCtx } } : {}),
   };
 
