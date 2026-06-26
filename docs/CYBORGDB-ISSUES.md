@@ -62,6 +62,13 @@ Severity legend: 🔴 blocks/major perf · 🟠 correctness/DX trap · 🟡 mino
 - **Fix / workaround:** For local/self-hosted, set neither (free tier + auth disabled). The SDK client's `apiKey` maps to the service **root key**, not the license key.
 - **Upstream:** Clearer naming / a single doc table (Docker Hub does have one, but it's easy to miss).
 
+## 10b. 🟠 Disk mode silently stores data in the container layer with no volume — no warning
+- **Symptom:** `cyborgdb-service` started with `CYBORGDB_DB_TYPE=disk` but no volume mounted at `CYBORGDB_DISK_PATH` runs fine and accepts writes — but all vector data lives in the container's writable layer and is **lost the moment the container is removed/recreated**, with no error or warning.
+- **Root cause:** The service doesn't check whether its disk path is backed by a mount/volume; persistence "works" until the container is gone.
+- **Impact:** A classic data-loss footgun — easy to `docker rm` (or `docker compose down -v`, or an image update) and silently wipe the index.
+- **Fix / workaround:** Always mount a named volume at the disk path (now done — see Deployment notes). 
+- **Upstream (requested):** In disk mode, the service should **log a clear warning at startup** when the disk path is not a mountpoint (e.g. "CYBORGDB_DISK_PATH is on the container's writable layer; mount a volume or data will be lost on container removal"). Erroring would be too strict (ephemeral/test runs are valid), but a warning is warranted.
+
 ## 10. 🟡 Docs discoverability
 - **Symptom:** `cyborgdb.co/docs` 404s; the embedding-model configuration page wasn't in the `docs.cyborg.co/llms.txt` index.
 - **Fix / workaround:** Real docs live at `docs.cyborg.co`; Docker Hub README is the most useful source for env vars.
