@@ -244,7 +244,7 @@
           <sc-if value="{{ syncingBanner }}">
             <div style="flex:0 0 auto; display:flex; align-items:center; gap:8px; padding:8px 26px; background:rgba(245,158,11,0.08); border-bottom:1px solid rgba(245,158,11,0.22); font-size:11.5px; color:#f59e0b; font-family:'Geist Mono',monospace;"><span style="width:6px;height:6px;border-radius:50%;background:#f59e0b;animation:kl-blink 1s infinite;flex:0 0 auto;"></span>sources updating — a sync is running for this space</div>
           </sc-if>
-          <div style="flex:1; overflow-y:auto; padding:24px 26px; display:flex; flex-direction:column; gap:22px; min-height:0;">
+          <div data-chat-scroll style="flex:1; overflow-y:auto; padding:24px 26px; display:flex; flex-direction:column; gap:22px; min-height:0;">
             <!-- no-connectors empty state -->
             <sc-if value="{{ showNoConnectors }}">
               <div style="margin:auto; text-align:center; max-width:440px; display:flex; flex-direction:column; align-items:center; gap:14px;">
@@ -891,6 +891,7 @@ class Component extends DCLogic {
     const nextActive = { ...this.state.activeConvBySpace, [sid]: convId };
     this.setState({ messages: msgs, railSources: rail, citedSet:{}, activeConvBySpace: nextActive });
     this.navSave(sid, nextActive);
+    this.scrollChatToBottom(true);
   }
   async selectConv(id){ this.setState({ view:'chat', convMenuOpen:false }); await this.openConversation(id); }
   toggleConvMenu(){ this.setState({ convMenuOpen:!this.state.convMenuOpen, convSearch:'' }); }
@@ -905,6 +906,18 @@ class Component extends DCLogic {
   }
   onDraft(e){ this.setState({ draft:e.target.value }); }
   onKey(e){ if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); this.send(); } }
+
+  // Keep the latest answer in view. `force` jumps to the bottom (new message /
+  // opening a thread); otherwise it only follows when the user is already near
+  // the bottom, so scrolling up to read history isn't yanked back down.
+  scrollChatToBottom(force){
+    requestAnimationFrame(()=>{
+      const el = document.querySelector('[data-chat-scroll]');
+      if (!el) return;
+      const nearBottom = (el.scrollHeight - el.scrollTop - el.clientHeight) < 140;
+      if (force || nearBottom) el.scrollTop = el.scrollHeight;
+    });
+  }
 
   async ensureConversation() {
     const sid = this.state.spaceId;
@@ -934,6 +947,7 @@ class Component extends DCLogic {
     const asstMsg = { role:'assistant', text:'', sources:[], kind:'normal', streaming:true };
     this.setState({ messages:[...this.state.messages, userMsg, asstMsg], draft:'',
       loading:true, streaming:true, loadingLabel:'searching the vector index…', railSources:[], citedSet:{} });
+    this.scrollChatToBottom(true);
 
     const controller = new AbortController();
     this._abort = controller;
@@ -1018,6 +1032,7 @@ class Component extends DCLogic {
     const msgs = this.state.messages.slice();
     for (let i=msgs.length-1;i>=0;i--){ if (msgs[i].role==='assistant'){ msgs[i]={...msgs[i], text:answer, streaming:true}; break; } }
     this.setState({ messages: msgs });
+    this.scrollChatToBottom();
   }
   // Mark the in-flight assistant bubble as an ungrounded (general-chat) answer
   // and attach the notice text so the bubble can label itself.
@@ -1032,6 +1047,7 @@ class Component extends DCLogic {
     const msgs = this.state.messages.slice();
     for (let i=msgs.length-1;i>=0;i--){ if (msgs[i].role==='assistant'){ msgs[i]={...msgs[i], text:answer, streaming:false, sources:(doneData.cards||[]), kind: ungrounded?'ungrounded':'normal' }; break; } }
     this.setState({ messages: msgs, streaming:false, loading:false, citedSet: cited, lastTiming: doneData.timing||null });
+    this.scrollChatToBottom();
   }
   handleStreamError(data) {
     const kind = data.kind || 'error';
@@ -1041,6 +1057,7 @@ class Component extends DCLogic {
       if (msgs[i].role==='assistant'){ msgs[i]={...msgs[i], text, streaming:false, kind: kind==='no-sources'?'no-sources':(kind==='retrieval-error'?'retrieval-error':'error'), sources:[] }; break; }
     }
     this.setState({ messages: msgs, streaming:false, loading:false, railSources:[] });
+    this.scrollChatToBottom();
   }
   failTurn(msg) {
     // drop the optimistic streaming assistant bubble, show an error in its place
