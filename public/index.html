@@ -797,11 +797,15 @@ class Component extends DCLogic {
     await this.loadSpaces();
   }
 
+  // ---------- nav persistence (survive page refresh) ----------
+  navGet(){ try { return JSON.parse(localStorage.getItem('kl.nav')||'{}'); } catch(e){ return {}; } }
+  navSave(spaceId, conv){ try { localStorage.setItem('kl.nav', JSON.stringify({ spaceId, conv })); } catch(e){} }
+
   // ---------- spaces ----------
   async loadSpaces() {
     const r = await this.apiJson('/api/spaces');
     const spaces = (r.ok && Array.isArray(r.body)) ? r.body : [];
-    let spaceId = this.state.spaceId;
+    let spaceId = this.state.spaceId || this.navGet().spaceId;
     if (!spaceId || !spaces.find(s=>s.id===spaceId)) spaceId = spaces.length ? spaces[0].id : null;
     this.setState({ spaces, spaceId });
     if (spaceId) await this.loadSpaceData(spaceId);
@@ -818,10 +822,14 @@ class Component extends DCLogic {
     const connectorsBySpace = { ...this.state.connectorsBySpace, [spaceId]: connectors };
     const syncingSpaces = { ...this.state.syncingSpaces };
     if (syncing) syncingSpaces[spaceId] = true; else delete syncingSpaces[spaceId];
-    let activeConv = this.state.activeConvBySpace[spaceId] || null;
+    // Restore the active conversation: in-memory → persisted (localStorage) →
+    // most-recent conversation. So a refresh lands back on the chat you were in.
+    let activeConv = this.state.activeConvBySpace[spaceId] || (this.navGet().conv||{})[spaceId] || null;
     if (activeConv && !convs.find(c=>c.id===activeConv)) activeConv = null;
-    this.setState({ convsBySpace, connectorsBySpace, syncingSpaces,
-      activeConvBySpace: { ...this.state.activeConvBySpace, [spaceId]: activeConv } });
+    if (!activeConv && convs.length) activeConv = convs[0].id;
+    const nextActive = { ...this.state.activeConvBySpace, [spaceId]: activeConv };
+    this.setState({ convsBySpace, connectorsBySpace, syncingSpaces, activeConvBySpace: nextActive });
+    this.navSave(spaceId, nextActive);
     if (activeConv) await this.openConversation(activeConv); else this.setState({ messages:[], railSources:[], citedSet:{} });
   }
   async selectSpace(id) {
@@ -859,8 +867,9 @@ class Component extends DCLogic {
     let rail = [];
     for (let i=msgs.length-1;i>=0;i--){ if (msgs[i].role==='assistant' && msgs[i].sources.length){ rail=msgs[i].sources; break; } }
     const sid = this.state.spaceId;
-    this.setState({ messages: msgs, railSources: rail, citedSet:{},
-      activeConvBySpace: { ...this.state.activeConvBySpace, [sid]: convId } });
+    const nextActive = { ...this.state.activeConvBySpace, [sid]: convId };
+    this.setState({ messages: msgs, railSources: rail, citedSet:{}, activeConvBySpace: nextActive });
+    this.navSave(sid, nextActive);
   }
   async selectConv(id){ this.setState({ view:'chat', convMenuOpen:false }); await this.openConversation(id); }
   toggleConvMenu(){ this.setState({ convMenuOpen:!this.state.convMenuOpen, convSearch:'' }); }
@@ -868,8 +877,10 @@ class Component extends DCLogic {
   onConvSearch(e){ this.setState({ convSearch:e.target.value }); }
   newChat(){
     const sid=this.state.spaceId;
+    const nextActive = { ...this.state.activeConvBySpace, [sid]: null };
     this.setState({ view:'chat', convMenuOpen:false, messages:[], railSources:[], citedSet:{},
-      activeConvBySpace: { ...this.state.activeConvBySpace, [sid]: null }, draft:'' });
+      activeConvBySpace: nextActive, draft:'' });
+    this.navSave(sid, nextActive);
   }
   onDraft(e){ this.setState({ draft:e.target.value }); }
   onKey(e){ if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); this.send(); } }
@@ -882,8 +893,9 @@ class Component extends DCLogic {
     if (!r.ok) return null;
     convId = r.body.id;
     const convs = [r.body, ...(this.state.convsBySpace[sid]||[])];
-    this.setState({ convsBySpace: { ...this.state.convsBySpace, [sid]: convs },
-      activeConvBySpace: { ...this.state.activeConvBySpace, [sid]: convId } });
+    const nextActive = { ...this.state.activeConvBySpace, [sid]: convId };
+    this.setState({ convsBySpace: { ...this.state.convsBySpace, [sid]: convs }, activeConvBySpace: nextActive });
+    this.navSave(sid, nextActive);
     return convId;
   }
 

@@ -21,6 +21,8 @@ import { getSettings } from "../settings/service.js";
 import {
   createConversation,
   appendMessage,
+  deriveConversationTitle,
+  setConversationTitle,
 } from "../spaces/service.js";
 import { composePrompt } from "./context.js";
 import { validateCitations, toSourceCard, type SourceCard } from "./citations.js";
@@ -173,6 +175,14 @@ export async function* runTurn(
   const { conversationId, space, history } = await resolveTarget(input);
   const topK = input.topK ?? DEFAULT_TOP_K;
   const spaceRef = toSpaceRef(space);
+
+  // Auto-name the conversation from the first query (history empty = first turn).
+  if (history.length === 0) {
+    await setConversationTitle(
+      conversationId,
+      deriveConversationTitle(input.userText),
+    );
+  }
 
   // 2. Retrieve. A failure here is R25 — never fall through to Ollama.
   let hits: CyborgHit[];

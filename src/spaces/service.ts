@@ -166,6 +166,29 @@ export function createConversation(
   });
 }
 
+// Default title a conversation is created with (Prisma schema default). A
+// conversation still carrying this is "unnamed" and eligible for auto-naming.
+export const DEFAULT_CONVERSATION_TITLE = "New chat";
+
+/**
+ * Derive a short conversation title from the first user message: whitespace
+ * collapsed, trimmed to ~48 chars on a word boundary with an ellipsis.
+ */
+export function deriveConversationTitle(text: string): string {
+  const t = text.trim().replace(/\s+/g, " ");
+  if (t.length === 0) return DEFAULT_CONVERSATION_TITLE;
+  if (t.length <= 48) return t;
+  return t.slice(0, 48).replace(/\s+\S*$/, "") + "…";
+}
+
+/** Set a conversation's title (used to auto-name from the first query). */
+export function setConversationTitle(
+  id: string,
+  title: string,
+): Promise<Conversation> {
+  return prisma.conversation.update({ where: { id }, data: { title } });
+}
+
 /**
  * A conversation with its messages in chronological order, or null if missing.
  * Used to reopen a thread from the list (R19).
