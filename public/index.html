@@ -281,7 +281,7 @@
                     </sc-if>
                     <sc-if value="{{ m.isAnswer }}">
                       <sc-if value="{{ m.isUngrounded }}"><div style="display:flex; align-items:center; gap:6px; margin-bottom:8px; font-size:11px; color:#f59e0b; border:1px solid rgba(245,158,11,0.3); border-radius:6px; padding:4px 9px; width:fit-content;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>{{ m.noticeLine }}</div></sc-if>
-                      <span><sc-for list="{{ m.segments }}" as="seg"><sc-if value="{{ seg.isText }}">{{ seg.v }}</sc-if><sc-if value="{{ seg.isInlineCode }}"><code style="font-family:'Geist Mono',monospace;font-size:12px;background:#0e1620;border:1px solid #1f2c3b;border-radius:4px;padding:1px 5px;color:#e8eef5;">{{ seg.v }}</code></sc-if><sc-if value="{{ seg.isCodeBlock }}"><pre style="margin:10px 0;padding:12px 14px;background:#0b1118;border:1px solid #1f2c3b;border-radius:8px;overflow-x:auto;font-family:'Geist Mono',monospace;font-size:12px;line-height:1.55;color:#dbe5f0;white-space:pre;"><code>{{ seg.v }}</code></pre></sc-if><sc-if value="{{ seg.isCite }}"><sup style="color:{{ seg.color }};font-family:'Geist Mono',monospace;font-size:10px;cursor:{{ seg.cursor }};">[{{ seg.v }}]</sup></sc-if></sc-for><sc-if value="{{ m.streaming }}"><span style="display:inline-block;width:7px;height:14px;background:#e0454a;margin-left:2px;vertical-align:text-bottom;animation:kl-blink 1s infinite;"></span></sc-if></span>
+                      <span><sc-for list="{{ m.segments }}" as="seg"><sc-if value="{{ seg.isText }}">{{ seg.v }}</sc-if><sc-if value="{{ seg.isInlineCode }}"><code style="font-family:'Geist Mono',monospace;font-size:12px;background:#0e1620;border:1px solid #1f2c3b;border-radius:4px;padding:1px 5px;color:#e8eef5;">{{ seg.v }}</code></sc-if><sc-if value="{{ seg.isCodeBlock }}"><div style="position:relative;margin:10px 0;"><button onClick="{{ seg.copy }}" title="Copy code" style="position:absolute;top:7px;right:7px;display:flex;align-items:center;gap:4px;background:#1a2532;border:1px solid #2a3a4c;border-radius:5px;padding:3px 7px;color:#aebac8;font:500 10px 'Geist';cursor:pointer;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Copy</button><pre style="margin:0;padding:12px 14px;background:#0b1118;border:1px solid #1f2c3b;border-radius:8px;overflow-x:auto;font-family:'Geist Mono',monospace;font-size:12px;line-height:1.55;color:#dbe5f0;white-space:pre;"><code>{{ seg.v }}</code></pre></div></sc-if><sc-if value="{{ seg.isCite }}"><sup style="color:{{ seg.color }};font-family:'Geist Mono',monospace;font-size:10px;cursor:{{ seg.cursor }};">[{{ seg.v }}]</sup></sc-if></sc-for><sc-if value="{{ m.streaming }}"><span style="display:inline-block;width:7px;height:14px;background:#e0454a;margin-left:2px;vertical-align:text-bottom;animation:kl-blink 1s infinite;"></span></sc-if></span>
                       <sc-if value="{{ m.hasSources }}"><div style="display:flex; gap:7px; flex-wrap:wrap; margin-top:10px;"><span style="font-size:11px;color:#768493;border:1px solid #1f2c3b;border-radius:6px;padding:3px 9px;font-family:'Geist Mono',monospace;">{{ m.sourceLine }}</span></div></sc-if>
                     </sc-if>
                   </div>
@@ -1151,14 +1151,21 @@ class Component extends DCLogic {
     let last=0, fm;
     while((fm=fence.exec(text))){
       if(fm.index>last) this._inlineSeg(text.slice(last,fm.index), citedSet, validated, out);
-      out.push(this._seg({ isCodeBlock:true, v: fm[2].replace(/\n$/,''), lang: fm[1]||'' }));
+      const code = fm[2].replace(/\n$/,'');
+      out.push(this._seg({ isCodeBlock:true, v: code, lang: fm[1]||'', copy: ()=>this.copyCode(code) }));
       last=fm.index+fm[0].length;
     }
     if(last<text.length) this._inlineSeg(text.slice(last), citedSet, validated, out);
     return out;
   }
   // Normalize a segment so every flag the template checks is always defined.
-  _seg(o){ return Object.assign({ isText:false, isCite:false, isCodeBlock:false, isInlineCode:false, v:'', lang:'' }, o); }
+  _seg(o){ return Object.assign({ isText:false, isCite:false, isCodeBlock:false, isInlineCode:false, v:'', lang:'', copy:null }, o); }
+  copyCode(text){
+    try {
+      navigator.clipboard.writeText(text);
+      this.flash('Copied to clipboard');
+    } catch(e) { this.flash('Copy failed — select and copy manually'); }
+  }
   _inlineSeg(text, citedSet, validated, out){
     const ic=/`([^`\n]+)`/g; let last=0, im;
     while((im=ic.exec(text))){
