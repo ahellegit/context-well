@@ -429,7 +429,7 @@
               </sc-if>
 
               <!-- upload files -->
-              <button onClick="{{ pickUploadFiles }}" disabled="{{ uploadBusy }}" title="Upload text, markdown, or code files" style="{{ uploadBtnStyle }}">
+              <button onClick="{{ pickUploadFiles }}" onDragOver="{{ onUploadDragOver }}" onDragLeave="{{ onUploadDragLeave }}" onDrop="{{ onUploadDrop }}" disabled="{{ uploadBusy }}" title="Upload or drag & drop text, markdown, or code files" style="{{ uploadBtnStyle }}">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>{{ uploadLabel }}
               </button>
 
@@ -694,6 +694,7 @@ class Component extends DCLogic {
       addFormOpen: false, newKind: 'github', newCred: '',
       // file upload
       uploadBusy: false,
+      uploadDragging: false,
       // settings (persisted)
       settingsModel: '',
       toast: null,
@@ -707,7 +708,7 @@ class Component extends DCLogic {
       'openPrompt','closePrompt','onPromptInput','savePrompt',
       'goChat','goSources',
       'openAddForm','cancelAddForm','onNewCred','submitConnector',
-      'pickUploadFiles','uploadFiles',
+      'pickUploadFiles','uploadFiles','onUploadDragOver','onUploadDragLeave','onUploadDrop',
     ].forEach(m => { this[m] = this[m].bind(this); });
     this.stop = (e)=>{ e && e.stopPropagation && e.stopPropagation(); };
   }
@@ -1146,6 +1147,16 @@ class Component extends DCLogic {
     input.onchange = () => { this.uploadFiles(input.files); };
     input.click();
   }
+  // Drag-and-drop onto the upload zone (reuses uploadFiles).
+  onUploadDragOver(e){ if (this.state.uploadBusy) return; e.preventDefault(); if (!this.state.uploadDragging) this.setState({ uploadDragging:true }); }
+  onUploadDragLeave(e){ e.preventDefault(); if (this.state.uploadDragging) this.setState({ uploadDragging:false }); }
+  onUploadDrop(e){
+    e.preventDefault();
+    this.setState({ uploadDragging:false });
+    if (this.state.uploadBusy || !this.state.spaceId) return;
+    const files = e.dataTransfer && e.dataTransfer.files;
+    if (files && files.length) this.uploadFiles(files);
+  }
   async uploadFiles(fileList){
     const sid = this.state.spaceId;
     if (!sid || !fileList || fileList.length===0) return;
@@ -1465,8 +1476,9 @@ class Component extends DCLogic {
       kindOptions, credPlaceholder, newCred: s.newCred, onNewCred:this.onNewCred,
       openAddForm:this.openAddForm, cancelAddForm:this.cancelAddForm, submitConnector:this.submitConnector,
       pickUploadFiles:this.pickUploadFiles, uploadBusy: s.uploadBusy,
-      uploadLabel: s.uploadBusy ? 'Uploading…' : 'Upload files',
-      uploadBtnStyle: 'display:flex; align-items:center; justify-content:center; gap:9px; background:#070a0e; border:1px dashed '+(s.uploadBusy?'#1f2c3b':'rgba(96,165,250,0.4)')+'; border-radius:10px; padding:14px; color:'+(s.uploadBusy?'#4d5b6b':'#aebac8')+'; cursor:'+(s.uploadBusy?'not-allowed':'pointer')+'; font:12.5px \'Geist\'; width:100%;',
+      onUploadDragOver:this.onUploadDragOver, onUploadDragLeave:this.onUploadDragLeave, onUploadDrop:this.onUploadDrop,
+      uploadLabel: s.uploadBusy ? 'Uploading…' : (s.uploadDragging ? 'Drop files to upload' : 'Upload files · or drag & drop'),
+      uploadBtnStyle: 'display:flex; align-items:center; justify-content:center; gap:9px; background:'+(s.uploadDragging?'rgba(96,165,250,0.12)':'#070a0e')+'; border:1px dashed '+(s.uploadBusy?'#1f2c3b':(s.uploadDragging?'#60a5fa':'rgba(96,165,250,0.4)'))+'; border-radius:10px; padding:14px; color:'+(s.uploadBusy?'#4d5b6b':(s.uploadDragging?'#60a5fa':'#aebac8'))+'; cursor:'+(s.uploadBusy?'not-allowed':'pointer')+'; font:12.5px \'Geist\'; width:100%; transition:background .12s,border-color .12s;',
       vectorLine: totalChunks+' chunks indexed · all-MiniLM-L6-v2 · cosine',
       spaceDocs, hasDocs: spaceDocs.length>0, docCount: spaceDocs.length,
       promptPreview: space ? (space.customPrompt || '(no custom prompt set — answers use the default behavior)') : '',
