@@ -27,6 +27,13 @@ import { validateCitations, toSourceCard, type SourceCard } from "./citations.js
 
 export const DEFAULT_TOP_K = 6;
 
+// Context window we ask Ollama to use. Many models default to a huge window
+// (e.g. 262144 for qwen3.6) which makes Ollama allocate a multi-GB KV cache and
+// do heavy per-request prompt-cache work — ~30s of latency before the first
+// token. Pinning a modest window keeps time-to-first-token low. It also bounds
+// the prompt budgeting in composePrompt so the two stay consistent.
+export const CHAT_NUM_CTX = 8192;
+
 // Notice shown when no sources matched and the turn falls back to general chat
 // (hybrid mode): the model answers from general knowledge, clearly labeled.
 export const NO_SOURCES_NOTICE =
@@ -183,6 +190,7 @@ export async function* runTurn(
       hits: [],
       history,
       grounded: false,
+      numCtx: CHAT_NUM_CTX,
     });
 
     let answer = "";
@@ -190,6 +198,7 @@ export async function* runTurn(
       url: settings.ollamaUrl,
       model: settings.chatModel,
       messages: composed.messages,
+      numCtx: CHAT_NUM_CTX,
       signal: input.signal,
     })) {
       answer += token;
@@ -224,6 +233,7 @@ export async function* runTurn(
     userText: input.userText,
     hits: usable,
     history,
+    numCtx: CHAT_NUM_CTX,
   });
 
   // Stream tokens, accumulating the full answer for post-stream citation
@@ -234,6 +244,7 @@ export async function* runTurn(
     url: settings.ollamaUrl,
     model: settings.chatModel,
     messages: composed.messages,
+    numCtx: CHAT_NUM_CTX,
     signal: input.signal,
   })) {
     answer += token;
