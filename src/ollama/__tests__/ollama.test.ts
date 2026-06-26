@@ -68,6 +68,19 @@ describe("validateOllamaUrl (SSRF guard)", () => {
     expect(validateOllamaUrl("http://169.254.10.10").ok).toBe(false);
   });
 
+  it("rejects encoded numeric IPs (decimal / hex / octal) that decode to private/metadata", () => {
+    // 167772165 === 10.0.0.5 (private), 0xa000005 === 10.0.0.5, octal too.
+    expect(validateOllamaUrl("http://167772165").ok).toBe(false);
+    expect(validateOllamaUrl("http://0xa000005").ok).toBe(false);
+    expect(validateOllamaUrl("http://3232235826").ok).toBe(false); // 192.168.1.50
+    // 2852039166 === 169.254.169.254 (the metadata IP) — always blocked.
+    expect(validateOllamaUrl("http://2852039166").ok).toBe(false);
+  });
+
+  it("rejects IPv4-mapped IPv6 pointing at the metadata IP", () => {
+    expect(validateOllamaUrl("http://[::ffff:169.254.169.254]").ok).toBe(false);
+  });
+
   it("rejects non-http(s) schemes", () => {
     expect(validateOllamaUrl("file:///etc/passwd").ok).toBe(false);
     expect(validateOllamaUrl("ftp://example.com").ok).toBe(false);
@@ -188,6 +201,19 @@ describe("testConnection", () => {
     const r = await testConnection("http://localhost:11434");
     expect(r.ok).toBe(false);
     expect(r.message).toMatch(/404/);
+  });
+
+  it("refuses to follow a redirect (3xx) from the host (SSRF — R29)", async () => {
+    // The liveness GET / returns a 302 (e.g. pointing at a private/metadata
+    // host). With redirect:"manual" we see the 3xx and must treat it as failure
+    // rather than follow it.
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(null, { status: 302, headers: { location: "http://169.254.169.254/" } })),
+    );
+    const r = await testConnection("http://localhost:11434");
+    expect(r.ok).toBe(false);
+    expect(r.message).toMatch(/redirect/i);
   });
 });
 

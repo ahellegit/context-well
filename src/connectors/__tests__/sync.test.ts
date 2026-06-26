@@ -55,7 +55,7 @@ vi.mock("../../cyborg/index-service.js", () => ({
 }));
 
 const { prisma } = await import("../../db/client.js");
-const { syncConnector, SyncInProgressError } = await import("../sync.js");
+const { syncConnector, SyncInProgressError, MAX_CHUNKS_PER_SYNC } = await import("../sync.js");
 const { registerConnector, clearConnectors } = await import("../registry.js");
 const { chunkId } = await import("../chunk.js");
 const connectorsRoutes = (await import("../routes.js")).default;
@@ -188,6 +188,43 @@ describe("syncConnector", () => {
     expect(docs).toHaveLength(1);
     expect(docs[0].externalRef).toBe("a.md");
   });
+
+  it("does NOT purge stale vectors when the sync truncated (cap hit)", async () => {
+    const space = await makeSpace("Truncated");
+    const conn = await makeConnector(space.id, ["repoA"]);
+
+    // First sync: two source units land cleanly (2 vectors).
+    program.set("repoA", [
+      { ref: "a.md", title: "a", chunks: ["aaa"] },
+      { ref: "b.md", title: "b", chunks: ["bbb"] },
+    ]);
+    await syncConnector(conn.id);
+    expect((await cyborg.listIds({ slug: space.slug })).length).toBe(2);
+
+    // Second sync: the source now drops b.md but emits MORE than the cap so the
+    // pull truncates before it can confirm the full fresh set. A truncated pull
+    // must NOT purge — b.md's vector is still valid and freshIds is incomplete.
+    const overCap: SourceUnit[] = [];
+    overCap.push({ ref: "a.md", title: "a", chunks: ["aaa"] });
+    // One big unit whose chunk count exceeds the cap.
+    overCap.push({
+      ref: "big.md",
+      title: "big",
+      chunks: Array.from({ length: MAX_CHUNKS_PER_SYNC + 5 }, (_, i) => `c${i}`),
+    });
+    program.set("repoA", overCap);
+
+    cyborg.deleteVectors.mockClear();
+    const result = await syncConnector(conn.id);
+
+    expect(result.truncated).toBe(true);
+    expect(result.status).toBe("partial");
+    expect(result.purged).toBe(0);
+    // The purge was skipped entirely — no deleteVectors call, and b.md survives.
+    expect(cyborg.deleteVectors).not.toHaveBeenCalled();
+    const ids = await cyborg.listIds({ slug: space.slug });
+    expect(ids).toContain(chunkId("fake", "repoA", "b.md", 0));
+  }, 20_000);
 
   it("is an idempotent no-op when the source is unchanged", async () => {
     const space = await makeSpace("Gamma");

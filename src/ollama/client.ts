@@ -62,7 +62,49 @@ function matchPrivateRangeV6(hostname: string): string | null {
   if (!h.includes(":")) return null;
   if (h.startsWith("fe80")) return "fe80::/10 (link-local)";
   if (h.startsWith("fc") || h.startsWith("fd")) return "fc00::/7 (unique-local)";
+  // IPv4-mapped IPv6 (e.g. ::ffff:169.254.169.254 or ::ffff:a9fe:a9fe): pull the
+  // embedded IPv4 and re-check it against the v4 private/metadata ranges.
+  const mapped = h.match(/::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/);
+  if (mapped) {
+    if (ALWAYS_BLOCKED_HOSTS.has(mapped[1])) return "169.254.0.0/16 (metadata, IPv4-mapped)";
+    const v4 = matchPrivateRange(mapped[1]);
+    if (v4) return `${v4} (IPv4-mapped)`;
+  }
+  const mappedHex = h.match(/::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+  if (mappedHex) {
+    const a = parseInt(mappedHex[1], 16);
+    const b = parseInt(mappedHex[2], 16);
+    const dotted = `${(a >> 8) & 0xff}.${a & 0xff}.${(b >> 8) & 0xff}.${b & 0xff}`;
+    if (ALWAYS_BLOCKED_HOSTS.has(dotted)) return "169.254.0.0/16 (metadata, IPv4-mapped)";
+    const v4 = matchPrivateRange(dotted);
+    if (v4) return `${v4} (IPv4-mapped)`;
+  }
   return null;
+}
+
+// Decode a host that is a bare-integer / hex / octal encoding of an IPv4 address
+// (e.g. `2130706433`, `0x7f000001`, `017700000001`) into dotted-quad form, or
+// null if it is not such an encoding. These forms are accepted by many resolvers
+// and are a classic SSRF guard bypass, so we canonicalize before range checks.
+function decodeNumericIPv4(host: string): string | null {
+  const h = host.trim();
+  let value: number | null = null;
+  if (/^0x[0-9a-f]+$/i.test(h)) {
+    value = parseInt(h, 16);
+  } else if (/^0[0-7]+$/.test(h)) {
+    value = parseInt(h, 8);
+  } else if (/^\d+$/.test(h)) {
+    value = Number(h);
+  }
+  if (value === null || !Number.isFinite(value) || value < 0 || value > 0xffffffff) {
+    return null;
+  }
+  return [
+    (value >>> 24) & 0xff,
+    (value >>> 16) & 0xff,
+    (value >>> 8) & 0xff,
+    value & 0xff,
+  ].join(".");
 }
 
 /**
@@ -97,6 +139,24 @@ export function validateOllamaUrl(input: string): UrlValidation {
     return {
       ok: false,
       reason: "This address points at a cloud metadata endpoint and is blocked.",
+    };
+  }
+
+  // A bare-integer / hex / octal IPv4 encoding (SSRF bypass): canonicalize to
+  // dotted-quad and reject if it is the metadata IP or any private/loopback
+  // range. We never treat an encoded form as the allowed literal localhost.
+  const decoded = decodeNumericIPv4(hostname);
+  if (decoded) {
+    if (ALWAYS_BLOCKED_HOSTS.has(decoded)) {
+      return {
+        ok: false,
+        reason: "This address points at a cloud metadata endpoint and is blocked.",
+      };
+    }
+    const range = matchPrivateRange(decoded) ?? (isLocalLoopback(decoded) ? "127.0.0.0/8 (loopback)" : null);
+    return {
+      ok: false,
+      reason: `Refusing to connect to an encoded numeric IP (${hostname} → ${decoded}${range ? `, ${range}` : ""}).`,
     };
   }
 
@@ -230,7 +290,20 @@ export async function testConnection(
   const liveController = new AbortController();
   const liveTimer = setTimeout(() => liveController.abort(), timeoutMs);
   try {
-    const res = await fetch(base + "/", { signal: liveController.signal });
+    const res = await fetch(base + "/", {
+      signal: liveController.signal,
+      redirect: "manual",
+    });
+    // A redirect (3xx) is treated as failure: it could point at a private /
+    // metadata host the SSRF guard already vetted away (R29).
+    if (res.status >= 300 && res.status < 400) {
+      clearTimeout(liveTimer);
+      return {
+        ok: false,
+        chatModels: [],
+        message: "Refusing to follow a redirect from the Ollama host.",
+      };
+    }
     // Ollama's root returns "Ollama is running". A 2xx (or even a 404 from a
     // reachable proxy) proves we connected; the tags probe below decides the
     // model story. Capture a version header if present.
@@ -247,7 +320,10 @@ export async function testConnection(
   const tagsTimer = setTimeout(() => tagsController.abort(), timeoutMs);
   let tagsRes: Response;
   try {
-    tagsRes = await fetch(base + "/api/tags", { signal: tagsController.signal });
+    tagsRes = await fetch(base + "/api/tags", {
+      signal: tagsController.signal,
+      redirect: "manual",
+    });
   } catch (err) {
     clearTimeout(tagsTimer);
     return { ok: false, chatModels: [], message: classifyFetchError(err) };
@@ -255,6 +331,14 @@ export async function testConnection(
     clearTimeout(tagsTimer);
   }
 
+  if (tagsRes.status >= 300 && tagsRes.status < 400) {
+    return {
+      ok: false,
+      version,
+      chatModels: [],
+      message: "Refusing to follow a redirect from the Ollama host.",
+    };
+  }
   if (tagsRes.status === 404) {
     return {
       ok: false,
@@ -402,8 +486,14 @@ export async function* streamChat(
       headers: { "content-type": "application/json" },
       body: JSON.stringify(requestBody),
       signal: controller.signal,
+      redirect: "manual",
     });
 
+    // A redirect (3xx) could point at a private/metadata host the SSRF guard
+    // already vetted away — refuse to follow it (R29).
+    if (res.status >= 300 && res.status < 400) {
+      throw new Error("Refusing to follow a redirect from the Ollama host.");
+    }
     if (!res.ok) {
       const detail = await res.text().catch(() => "");
       throw new Error(

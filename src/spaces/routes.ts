@@ -16,6 +16,7 @@ import {
   getSpace,
   listConversations,
   listSpaces,
+  publicSpace,
   updateCustomPrompt,
 } from "./service.js";
 
@@ -32,9 +33,9 @@ interface CreateConversationBody {
 }
 
 export default async function spacesRoutes(app: FastifyInstance): Promise<void> {
-  // List all spaces.
+  // List all spaces (indexKey stripped — never crosses the API boundary, R29).
   app.get("/api/spaces", async () => {
-    return listSpaces();
+    return (await listSpaces()).map(publicSpace);
   });
 
   // Create a space (provisions its CyborgDB index, R7).
@@ -44,7 +45,7 @@ export default async function spacesRoutes(app: FastifyInstance): Promise<void> 
       return reply.code(400).send({ error: "A non-empty name is required." });
     }
     const space = await createSpace({ name: body.name });
-    return reply.code(201).send(space);
+    return reply.code(201).send(publicSpace(space));
   });
 
   // Delete a space (tears down its index, then cascades rows, R7).
@@ -69,7 +70,8 @@ export default async function spacesRoutes(app: FastifyInstance): Promise<void> 
     if (!space) {
       return reply.code(404).send({ error: "Space not found." });
     }
-    return updateCustomPrompt(id, body.prompt);
+    const updated = await updateCustomPrompt(id, body.prompt);
+    return reply.code(200).send({ customPrompt: updated.customPrompt });
   });
 
   // List a space's conversations (R19).

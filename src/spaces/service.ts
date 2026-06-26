@@ -20,6 +20,18 @@ import {
   type SpaceRef,
 } from "../cyborg/index-service.js";
 
+// --- Public projection -----------------------------------------------------
+
+// A Space without its secret 32-byte index key (KTD4/KTD5). Used everywhere a
+// Space crosses the API boundary so the key never reaches the browser (R29).
+export type PublicSpace = Omit<Space, "indexKey">;
+
+/** Strip the secret indexKey from a Space before it crosses the API boundary. */
+export function publicSpace(space: Space): PublicSpace {
+  const { indexKey: _indexKey, ...rest } = space;
+  return rest;
+}
+
 // --- Slug derivation -------------------------------------------------------
 
 /**

@@ -99,7 +99,7 @@ async function ghFetch(token: string, url: string): Promise<Response> {
 
   let attempt = 0;
   for (;;) {
-    const res = await fetch(url, { headers });
+    const res = await fetch(url, { headers, signal: AbortSignal.timeout(30_000) });
 
     // Primary (429) or secondary rate limit. The secondary limit can also arrive
     // as 403 with a Retry-After header; treat a present Retry-After as the signal.
@@ -110,7 +110,7 @@ async function ghFetch(token: string, url: string): Promise<Response> {
     if (isRateLimited && attempt < MAX_RETRIES) {
       attempt += 1;
       const waitMs = retryAfter
-        ? Number(retryAfter) * 1000
+        ? Math.min(Number(retryAfter) * 1000, 60_000)
         : Math.min(2 ** attempt * 1000, 60_000);
       await sleep(Number.isFinite(waitMs) && waitMs > 0 ? waitMs : 1000);
       continue;

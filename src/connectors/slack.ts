@@ -112,12 +112,13 @@ async function slackCall<T extends SlackResponse>(
         Authorization: `Bearer ${token}`,
         Accept: "application/json",
       },
+      signal: AbortSignal.timeout(30_000),
     });
 
     if (res.status === 429 && attempt < MAX_RETRIES) {
       const retryAfter = res.headers.get("retry-after");
       const waitMs = retryAfter
-        ? Number(retryAfter) * 1000
+        ? Math.min(Number(retryAfter) * 1000, 60_000)
         : DEFAULT_RETRY_MS * (attempt + 1);
       attempt += 1;
       await sleep(Number.isFinite(waitMs) && waitMs > 0 ? waitMs : DEFAULT_RETRY_MS);

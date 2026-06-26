@@ -83,11 +83,19 @@ export interface ComposedPrompt {
   historyDropped: number;
 }
 
+// Neutralize any literal `</source` in untrusted retrieved content so a chunk
+// cannot forge a closing delimiter and break out of its <source n> wrapper
+// (R29/KTD12). Case-insensitive; the inserted zero-width space keeps the text
+// readable while defeating the literal token match.
+function neutralizeSourceDelimiter(text: string): string {
+  return text.replace(/<\/source/gi, "<​/source");
+}
+
 /** Render a hit as a delimited `<source n>` block (R29). */
 function renderSource(hit: CyborgHit, n: number): string {
   const md = hit.metadata as Record<string, unknown>;
-  const title = typeof md.title === "string" ? md.title : "";
-  const snippet = typeof md.snippet === "string" ? md.snippet : "";
+  const title = typeof md.title === "string" ? neutralizeSourceDelimiter(md.title) : "";
+  const snippet = typeof md.snippet === "string" ? neutralizeSourceDelimiter(md.snippet) : "";
   const header = title ? `${title}\n` : "";
   return `<source ${n}>\n${header}${snippet}\n</source ${n}>`;
 }

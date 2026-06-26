@@ -65,7 +65,7 @@ export default async function chatRoutes(app: FastifyInstance): Promise<void> {
         conversationId: id,
         userText: body.text,
         signal: controller.signal,
-        userName: (request as { user?: { name?: string } }).user?.name,
+        userName: request.user?.email,
       })) {
         switch (event.type) {
           case "sources":

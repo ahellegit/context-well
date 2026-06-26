@@ -8,6 +8,7 @@
 // Prisma runs against the throwaway SQLite DB provisioned by the suite-wide
 // setupFile (vitest.config.ts -> src/auth/__tests__/setup-env.ts).
 
+import Fastify, { type FastifyInstance } from "fastify";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock the cyborg index-service. provisionIndex / deleteIndex are spies the
@@ -36,6 +37,7 @@ const {
   slugify,
   updateCustomPrompt,
 } = await import("../service.js");
+const spacesRoutes = (await import("../routes.js")).default;
 
 beforeEach(async () => {
   // Cascades clear connectors/documents/conversations/messages with the space.
@@ -149,6 +151,43 @@ describe("updateCustomPrompt", () => {
     // Re-read confirms persistence with no substitution applied.
     const reread = await getSpace(space.id);
     expect(reread?.customPrompt).toBe(template);
+  });
+});
+
+describe("spacesRoutes — indexKey never crosses the API boundary (R29)", () => {
+  let app: FastifyInstance;
+
+  beforeEach(async () => {
+    app = Fastify();
+    await app.register(spacesRoutes);
+    await app.ready();
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  it("omits indexKey from GET /api/spaces and POST /api/spaces responses", async () => {
+    // POST creates a space (provisionIndex mock stamps an indexKey on the row).
+    const created = await app.inject({
+      method: "POST",
+      url: "/api/spaces",
+      payload: { name: "Secret Space" },
+    });
+    expect(created.statusCode).toBe(201);
+    const createdBody = created.json();
+    expect(createdBody.indexKey).toBeUndefined();
+    expect(createdBody.slug).toBe("secret-space");
+    // The raw key never appears anywhere in the serialized response.
+    expect(created.payload).not.toContain("a".repeat(64));
+
+    // GET lists spaces without the key.
+    const listed = await app.inject({ method: "GET", url: "/api/spaces" });
+    expect(listed.statusCode).toBe(200);
+    const listedBody = listed.json() as Array<Record<string, unknown>>;
+    expect(listedBody.length).toBeGreaterThan(0);
+    for (const s of listedBody) expect(s.indexKey).toBeUndefined();
+    expect(listed.payload).not.toContain("a".repeat(64));
   });
 });
 
