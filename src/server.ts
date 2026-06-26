@@ -10,6 +10,7 @@ import { registerAuthGuard } from "./auth/guard.js";
 import settingsRoutes from "./settings/routes.js";
 import spacesRoutes from "./spaces/routes.js";
 import connectorsRoutes from "./connectors/routes.js";
+import "./connectors/bootstrap.js"; // populates the connector registry (github, slack)
 import chatRoutes from "./chat/routes.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
