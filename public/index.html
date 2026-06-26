@@ -1172,7 +1172,7 @@ class Component extends DCLogic {
   timingView(tm){
     const tot=Math.max((tm.totalMs||0),1);
     const phases=[
-      { label:'retrieval', ms:tm.retrievalMs||0, color:'#2dd4bf' },
+      { label:'CyborgDB retrieval', ms:tm.retrievalMs||0, color:'#2dd4bf' },
       { label:'model',     ms:tm.firstTokenMs||0, color:'#f59e0b' },
       { label:'generation',ms:tm.genMs||0, color:'#e0454a' },
     ];
@@ -1181,7 +1181,7 @@ class Component extends DCLogic {
     if(other>0) phases.push({ label:'other', ms:other, color:'#2a3a4c' });
     return {
       bar: phases.map(p=>({ color:p.color, width:Math.max(1,(p.ms/tot)*100)+'%', title:p.label+' '+this.fmtMs(p.ms) })),
-      label: this.fmtMs(tm.totalMs)+' total · retrieval '+this.fmtMs(tm.retrievalMs)+' · model '+this.fmtMs(tm.firstTokenMs)+' · gen '+this.fmtMs(tm.genMs),
+      label: this.fmtMs(tm.totalMs)+' total · CyborgDB retrieval '+this.fmtMs(tm.retrievalMs)+' · model '+this.fmtMs(tm.firstTokenMs)+' · gen '+this.fmtMs(tm.genMs),
     };
   }
   _inlineSeg(text, citedSet, validated, out){
