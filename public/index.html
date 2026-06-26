@@ -280,6 +280,7 @@
                       </div>
                     </sc-if>
                     <sc-if value="{{ m.isAnswer }}">
+                      <sc-if value="{{ m.isUngrounded }}"><div style="display:flex; align-items:center; gap:6px; margin-bottom:8px; font-size:11px; color:#f59e0b; border:1px solid rgba(245,158,11,0.3); border-radius:6px; padding:4px 9px; width:fit-content;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>{{ m.noticeLine }}</div></sc-if>
                       <span><sc-for list="{{ m.segments }}" as="seg"><sc-if value="{{ seg.isText }}">{{ seg.v }}</sc-if><sc-if value="{{ seg.isCite }}"><sup style="color:{{ seg.color }};font-family:'Geist Mono',monospace;font-size:10px;cursor:{{ seg.cursor }};">[{{ seg.v }}]</sup></sc-if></sc-for><sc-if value="{{ m.streaming }}"><span style="display:inline-block;width:7px;height:14px;background:#e0454a;margin-left:2px;vertical-align:text-bottom;animation:kl-blink 1s infinite;"></span></sc-if></span>
                       <sc-if value="{{ m.hasSources }}"><div style="display:flex; gap:7px; flex-wrap:wrap; margin-top:10px;"><span style="font-size:11px;color:#768493;border:1px solid #1f2c3b;border-radius:6px;padding:3px 9px;font-family:'Geist Mono',monospace;">{{ m.sourceLine }}</span></div></sc-if>
                     </sc-if>
@@ -923,6 +924,8 @@ class Component extends DCLogic {
           if (!evt) continue;
           if (evt.event==='sources') {
             this.setState({ railSources: (evt.data.cards||[]), loading:false, loadingLabel:'' });
+          } else if (evt.event==='notice') {
+            this.markStreamingNotice(evt.data.message||'');
           } else if (evt.event==='token') {
             answer += (evt.data.value||'');
             this.updateStreamingAnswer(answer);
@@ -970,10 +973,18 @@ class Component extends DCLogic {
     for (let i=msgs.length-1;i>=0;i--){ if (msgs[i].role==='assistant'){ msgs[i]={...msgs[i], text:answer, streaming:true}; break; } }
     this.setState({ messages: msgs });
   }
+  // Mark the in-flight assistant bubble as an ungrounded (general-chat) answer
+  // and attach the notice text so the bubble can label itself.
+  markStreamingNotice(message) {
+    const msgs = this.state.messages.slice();
+    for (let i=msgs.length-1;i>=0;i--){ if (msgs[i].role==='assistant'){ msgs[i]={...msgs[i], notice:message, ungrounded:true}; break; } }
+    this.setState({ messages: msgs });
+  }
   finishStreamingAnswer(answer, doneData) {
     const cited = {}; (doneData.cited||[]).forEach(n=>{ cited[n]=true; });
+    const ungrounded = doneData.grounded===false;
     const msgs = this.state.messages.slice();
-    for (let i=msgs.length-1;i>=0;i--){ if (msgs[i].role==='assistant'){ msgs[i]={...msgs[i], text:answer, streaming:false, sources:(doneData.cards||[]), kind:'normal' }; break; } }
+    for (let i=msgs.length-1;i>=0;i--){ if (msgs[i].role==='assistant'){ msgs[i]={...msgs[i], text:answer, streaming:false, sources:(doneData.cards||[]), kind: ungrounded?'ungrounded':'normal' }; break; } }
     this.setState({ messages: msgs, streaming:false, loading:false, citedSet: cited });
   }
   handleStreamError(data) {
@@ -1209,14 +1220,16 @@ class Component extends DCLogic {
     // messages render
     const msgs = s.messages.map(m=>{
       if (m.role==='user') return { isUser:true, isAssistant:false, text:m.text };
-      const isError = m.kind==='no-sources' || m.kind==='retrieval-error' || m.kind==='error';
+      const isError = m.kind==='retrieval-error' || m.kind==='error';
+      const isUngrounded = m.kind==='ungrounded' || !!m.ungrounded;
       const srcs = m.sources||[];
       const validated = !m.streaming && m.kind==='normal';
       const errIcon = m.kind==='retrieval-error' ? '#f87171' : (m.kind==='no-sources' ? '#f59e0b' : '#f87171');
       const avgScore = srcs.length ? (srcs.reduce((a,x)=>a+(x.score||0),0)/srcs.length) : 0;
       return {
         isUser:false, isAssistant:true,
-        isError, isAnswer: !isError,
+        isError, isAnswer: !isError, isUngrounded,
+        noticeLine: m.notice || 'Answered from general knowledge — no matching sources in this space.',
         kind: m.kind, text: m.text, streaming: !!m.streaming,
         segments: this.splitSeg(m.text||'', s.citedSet, validated),
         hasSources: !isError && srcs.length>0 && !m.streaming,

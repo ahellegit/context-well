@@ -5,14 +5,16 @@
 // owns the RAG logic; this module is the transport adapter only.
 //
 // SSE event shapes (each frame is `event: <name>\ndata: <json>\n\n`):
-//   - `sources`         data: { cards: SourceCard[] }      (rail candidates, at stream start)
+//   - `sources`         data: { cards: SourceCard[] }      (rail candidates, at stream start; [] when ungrounded)
+//   - `notice`          data: { message }                  (hybrid: no sources matched, answer is ungrounded)
 //   - `token`           data: { value: string }            (one per streamed chunk)
-//   - `error`           data: { kind, message }            (R18 no-sources / R25 retrieval-error / generic)
-//   - `done`            data: { conversationId, cited, dropped, cards }
+//   - `error`           data: { kind, message }            (R25 retrieval-error / generic stream failure)
+//   - `done`            data: { conversationId, cited, dropped, cards, grounded }
 //
-// The R18 no-sources case and the R25 retrieval-error case are surfaced as
-// distinct `error` event *kinds* ("no-sources" vs "retrieval-error") so the
-// client renders them as different states (R18 vs R25 must be distinguishable).
+// A genuine CyborgDB *failure* (R25) is surfaced as an `error` event with kind
+// "retrieval-error" and never an answer. An empty result is NOT an error: the
+// turn falls back to general chat (a `notice` then streamed tokens), with
+// `done.grounded:false` so the client can label the answer as ungrounded.
 //
 // NOTE: the orchestrator mounts this plugin inside the authenticated scope and
 // applies the auth guard; routes use full `/api/*` paths, so mount without a
@@ -74,13 +76,9 @@ export default async function chatRoutes(app: FastifyInstance): Promise<void> {
           case "token":
             write(reply, "token", { value: event.value });
             break;
-          case "no-sources":
-            // R18: distinct error kind, no answer streamed.
-            write(reply, "error", {
-              kind: "no-sources",
-              message: event.message,
-              conversationId: event.conversationId,
-            });
+          case "notice":
+            // Hybrid: no sources matched; the streamed answer is ungrounded.
+            write(reply, "notice", { message: event.message });
             break;
           case "done":
             write(reply, "done", {
@@ -88,6 +86,7 @@ export default async function chatRoutes(app: FastifyInstance): Promise<void> {
               cited: event.cited,
               dropped: event.dropped,
               cards: event.cards,
+              grounded: event.grounded,
             });
             break;
         }

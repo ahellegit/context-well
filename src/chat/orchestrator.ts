@@ -27,9 +27,10 @@ import { validateCitations, toSourceCard, type SourceCard } from "./citations.js
 
 export const DEFAULT_TOP_K = 6;
 
-// Copy for the two grounded-refusal / failure states (R18 / R25).
-export const NO_SOURCES_MESSAGE =
-  "No relevant sources in this space — try syncing a connector or rephrasing your question.";
+// Notice shown when no sources matched and the turn falls back to general chat
+// (hybrid mode): the model answers from general knowledge, clearly labeled.
+export const NO_SOURCES_NOTICE =
+  "No matching sources in this space — answering from the model's general knowledge.";
 export const RETRIEVAL_ERROR_MESSAGE =
   "Retrieval failed — the index is unreachable, so your question was not sent to the model. Try again in a moment.";
 
@@ -51,20 +52,23 @@ export class RetrievalError extends Error {
 
 export type TurnEvent =
   // The retrieved candidate cards for the sources rail, emitted at stream start
-  // (before the LLM call) so the UI can populate the rail immediately.
+  // (before the LLM call) so the UI can populate the rail immediately. Empty
+  // when the turn fell back to general chat (no matching sources).
   | { type: "sources"; cards: SourceCard[] }
-  // A no-sources turn (R18): no usable hits, no LLM call. The conversation id
-  // lets the client associate/refresh the thread.
-  | { type: "no-sources"; conversationId: string; message: string }
+  // Hybrid general-chat notice: no sources matched, so the answer that follows
+  // is ungrounded (general knowledge) and the UI should label it as such.
+  | { type: "notice"; message: string }
   // A streamed answer token.
   | { type: "token"; value: string }
   // Stream complete: validated citations + the persisted snapshot (R17/R30).
+  // `grounded` is false for the general-chat fallback (cited/cards empty).
   | {
       type: "done";
       conversationId: string;
       cited: number[];
       dropped: number[];
       cards: SourceCard[];
+      grounded: boolean;
     };
 
 export interface RunTurnInput {
@@ -164,14 +168,48 @@ export async function* runTurn(
   const usable = hits.filter((h) => h.similarity >= space.similarityThreshold);
 
   if (usable.length === 0) {
-    // No-sources turn (R18): persist the exchange, never call the model.
+    // Hybrid general-chat fallback: no matching sources, so answer from the
+    // model's general knowledge, clearly labeled as ungrounded. (A CyborgDB
+    // *failure* is still a hard RetrievalError above and never reaches here —
+    // this branch is only the genuine empty-result case.)
+    yield { type: "sources", cards: [] };
+    yield { type: "notice", message: NO_SOURCES_NOTICE };
+
+    const settings = await getSettings();
+    const composed = composePrompt({
+      customPrompt: space.customPrompt,
+      vars: { spaceName: space.name, userName: input.userName },
+      userText: input.userText,
+      hits: [],
+      history,
+      grounded: false,
+    });
+
+    let answer = "";
+    for await (const token of streamChat({
+      url: settings.ollamaUrl,
+      model: settings.chatModel,
+      messages: composed.messages,
+      signal: input.signal,
+    })) {
+      answer += token;
+      yield { type: "token", value: token };
+    }
+
     await appendMessage(conversationId, { role: "user", text: input.userText });
     await appendMessage(conversationId, {
       role: "assistant",
-      text: NO_SOURCES_MESSAGE,
+      text: answer,
       sources: [],
     });
-    yield { type: "no-sources", conversationId, message: NO_SOURCES_MESSAGE };
+    yield {
+      type: "done",
+      conversationId,
+      cited: [],
+      dropped: [],
+      cards: [],
+      grounded: false,
+    };
     return;
   }
 
@@ -221,5 +259,6 @@ export async function* runTurn(
     cited: citedNumbers,
     dropped: droppedNumbers,
     cards: citedCards,
+    grounded: true,
   };
 }

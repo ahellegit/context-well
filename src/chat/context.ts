@@ -57,6 +57,15 @@ const DATA_DELIMITER_INSTRUCTION =
   "use a source, cite it inline with its number in square brackets, e.g. [1]. If " +
   "the sources do not contain the answer, say so rather than inventing one.";
 
+// Instruction for the hybrid general-chat fallback: no sources matched in the
+// space, so answer from general knowledge and be honest that it isn't grounded
+// in the space's documents (no fabricated citations).
+const GENERAL_CHAT_INSTRUCTION =
+  "No matching sources were found in this knowledge space for the user's question. " +
+  "Answer from your own general knowledge and be helpful. Make clear you are " +
+  "answering without sources from this space, and never fabricate citations or " +
+  "claim to quote the space's documents.";
+
 export interface ComposePromptInput {
   // The raw custom-prompt template for the space (R20 placeholders intact).
   customPrompt: string;
@@ -73,6 +82,10 @@ export interface ComposePromptInput {
   history?: ChatMessage[];
   // The selected model's context window; falls back to DEFAULT_NUM_CTX.
   numCtx?: number;
+  // When false, compose a general-chat (ungrounded) prompt: no sources are
+  // injected and the model answers from general knowledge, clearly labeled.
+  // Defaults to true (grounded). `hits` is ignored when false.
+  grounded?: boolean;
 }
 
 export interface ComposedPrompt {
@@ -118,32 +131,41 @@ export function composePrompt(input: ComposePromptInput): ComposedPrompt {
   const budget = Math.max(numCtx - COMPLETION_RESERVE_TOKENS, 256);
 
   const substitutedPrompt = substituteVars(input.customPrompt, input.vars).trim();
+  const grounded = input.grounded !== false;
 
-  // Build the delimited source blocks, capping their total token count so a
-  // large retrieved context cannot crowd out the system prompt/query (KTD9).
-  const contextCap = Math.floor(budget * CONTEXT_BUDGET_FRACTION);
-  const sourceBlocks: string[] = [];
-  let contextTokens = 0;
-  for (let i = 0; i < input.hits.length; i++) {
-    const block = renderSource(input.hits[i], i + 1);
-    const blockTokens = estimateTokens(block);
-    if (sourceBlocks.length > 0 && contextTokens + blockTokens > contextCap) {
-      // Keep at least the first source; stop once the cap would be exceeded.
-      break;
+  let systemContent: string;
+  if (grounded) {
+    // Build the delimited source blocks, capping their total token count so a
+    // large retrieved context cannot crowd out the system prompt/query (KTD9).
+    const contextCap = Math.floor(budget * CONTEXT_BUDGET_FRACTION);
+    const sourceBlocks: string[] = [];
+    let contextTokens = 0;
+    for (let i = 0; i < input.hits.length; i++) {
+      const block = renderSource(input.hits[i], i + 1);
+      const blockTokens = estimateTokens(block);
+      if (sourceBlocks.length > 0 && contextTokens + blockTokens > contextCap) {
+        // Keep at least the first source; stop once the cap would be exceeded.
+        break;
+      }
+      sourceBlocks.push(block);
+      contextTokens += blockTokens;
     }
-    sourceBlocks.push(block);
-    contextTokens += blockTokens;
-  }
 
-  const sourcesSection =
-    sourceBlocks.length > 0
-      ? `\n\nSources:\n${sourceBlocks.join("\n\n")}`
-      : "\n\n(No sources were retrieved.)";
+    const sourcesSection =
+      sourceBlocks.length > 0
+        ? `\n\nSources:\n${sourceBlocks.join("\n\n")}`
+        : "\n\n(No sources were retrieved.)";
 
-  const systemContent =
-    [substitutedPrompt, DATA_DELIMITER_INSTRUCTION]
+    systemContent =
+      [substitutedPrompt, DATA_DELIMITER_INSTRUCTION]
+        .filter((s) => s.length > 0)
+        .join("\n\n") + sourcesSection;
+  } else {
+    // General-chat fallback: no sources, answer from general knowledge (labeled).
+    systemContent = [substitutedPrompt, GENERAL_CHAT_INSTRUCTION]
       .filter((s) => s.length > 0)
-      .join("\n\n") + sourcesSection;
+      .join("\n\n");
+  }
 
   const systemMessage: ChatMessage = { role: "system", content: systemContent };
   const userMessage: ChatMessage = { role: "user", content: input.userText };

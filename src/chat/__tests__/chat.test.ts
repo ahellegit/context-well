@@ -43,7 +43,7 @@ const { prisma } = await import("../../db/client.js");
 const {
   runTurn,
   RetrievalError,
-  NO_SOURCES_MESSAGE,
+  NO_SOURCES_NOTICE,
   DEFAULT_TOP_K,
 } = await import("../orchestrator.js");
 const { composePrompt, substituteVars } = await import("../context.js");
@@ -252,35 +252,42 @@ describe("composePrompt injection delimiting (R29 / R20)", () => {
   });
 });
 
-describe("runTurn — no usable hits (AE1 / R18)", () => {
-  it("returns a no-sources turn, calls no Ollama, persists the refusal", async () => {
+describe("runTurn — no usable hits → general-chat fallback (hybrid)", () => {
+  it("falls back to ungrounded chat: notices, streams an answer, persists it without sources", async () => {
     // One hit below the 0.35 threshold → not usable.
     queryMock.mockResolvedValue([hit({ id: "low", similarity: 0.1 })]);
+    streamChatMock.mockImplementation(streamOf(["From ", "general ", "knowledge."]));
 
     const events = await drain(runTurn({ conversationId, userText: "anything?" }));
 
-    expect(queryMock).toHaveBeenCalledWith(
-      expect.objectContaining({ slug: expect.any(String) }),
-      "anything?",
-      DEFAULT_TOP_K,
-    );
-    expect(streamChatMock).not.toHaveBeenCalled();
+    // The model IS called now (hybrid), with an ungrounded prompt.
+    expect(streamChatMock).toHaveBeenCalled();
 
-    const noSources = events.find(
-      (e): e is { type: "no-sources"; message: string } =>
-        (e as { type: string }).type === "no-sources",
+    // A notice event labels the answer as ungrounded.
+    const notice = events.find(
+      (e): e is { type: "notice"; message: string } =>
+        (e as { type: string }).type === "notice",
     );
-    expect(noSources?.message).toBe(NO_SOURCES_MESSAGE);
-    // No `sources` rail event when there are no usable hits.
-    expect(events.some((e) => (e as { type: string }).type === "sources")).toBe(false);
+    expect(notice?.message).toBe(NO_SOURCES_NOTICE);
 
-    // Persisted: a user message and a no-sources assistant message.
+    // Empty rail + an ungrounded done.
+    const sourcesEv = events.find((e) => (e as { type: string }).type === "sources") as
+      | { type: "sources"; cards: unknown[] }
+      | undefined;
+    expect(sourcesEv?.cards).toEqual([]);
+    const done = events.find((e) => (e as { type: string }).type === "done") as
+      | { type: "done"; grounded: boolean; cards: unknown[] }
+      | undefined;
+    expect(done?.grounded).toBe(false);
+    expect(done?.cards).toEqual([]);
+
+    // Persisted: the user message + the streamed answer (no sources).
     const convo = await prisma.conversation.findUnique({
       where: { id: conversationId },
       include: { messages: { orderBy: { createdAt: "asc" } } },
     });
     expect(convo?.messages.map((m) => m.role)).toEqual(["user", "assistant"]);
-    expect(convo?.messages[1].text).toBe(NO_SOURCES_MESSAGE);
+    expect(convo?.messages[1].text).toBe("From general knowledge.");
     expect(convo?.messages[1].sources).toBe("[]");
   });
 });
