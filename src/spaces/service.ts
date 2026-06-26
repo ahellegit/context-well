@@ -148,6 +148,37 @@ function toRef(space: Space): SpaceRef {
 
 // --- Conversations & messages (R19) ----------------------------------------
 
+export interface SpaceDocument {
+  id: string;
+  title: string;
+  externalRef: string;
+  connector: string; // connector kind: "github" | "slack" | "upload"
+  chunks: number; // number of vectors (DocumentVector rows) for this document
+}
+
+/**
+ * The documents currently indexed in a space (the "files in context"): one per
+ * ingested source unit (uploaded file, GitHub file/issue, Slack thread), with
+ * its connector kind and chunk count. Grouped by connector, titled A→Z.
+ */
+export async function listDocuments(spaceId: string): Promise<SpaceDocument[]> {
+  const docs = await prisma.document.findMany({
+    where: { spaceId },
+    include: {
+      connector: { select: { kind: true } },
+      _count: { select: { vectors: true } },
+    },
+    orderBy: [{ connectorId: "asc" }, { title: "asc" }],
+  });
+  return docs.map((d) => ({
+    id: d.id,
+    title: d.title,
+    externalRef: d.externalRef,
+    connector: d.connector?.kind ?? "unknown",
+    chunks: d._count.vectors,
+  }));
+}
+
 /** Conversations for a space, most-recently-updated first. */
 export function listConversations(spaceId: string): Promise<Conversation[]> {
   return prisma.conversation.findMany({

@@ -33,6 +33,7 @@ const {
   getConversation,
   getSpace,
   listConversations,
+  listDocuments,
   listSpaces,
   slugify,
   updateCustomPrompt,
@@ -236,5 +237,44 @@ describe("conversations & messages", () => {
     // first is now most-recently-updated, so it sorts ahead of second.
     convos = await listConversations(space.id);
     expect(convos[0].id).toBe(first.id);
+  });
+});
+
+describe("listDocuments — files in context", () => {
+  it("lists indexed documents with connector kind and chunk counts", async () => {
+    const space = await createSpace({ name: "Docs Space" });
+    const connector = await prisma.connector.create({
+      data: { spaceId: space.id, kind: "upload", credentials: "" },
+    });
+    await prisma.document.create({
+      data: {
+        spaceId: space.id,
+        connectorId: connector.id,
+        externalRef: "runbook.md",
+        title: "runbook.md",
+        vectors: { create: [{ vectorId: "v1" }, { vectorId: "v2" }, { vectorId: "v3" }] },
+      },
+    });
+    await prisma.document.create({
+      data: {
+        spaceId: space.id,
+        connectorId: connector.id,
+        externalRef: "notes.md",
+        title: "notes.md",
+        vectors: { create: [{ vectorId: "n1" }] },
+      },
+    });
+
+    const docs = await listDocuments(space.id);
+    expect(docs).toHaveLength(2);
+    const byTitle = Object.fromEntries(docs.map((d) => [d.title, d]));
+    expect(byTitle["runbook.md"].connector).toBe("upload");
+    expect(byTitle["runbook.md"].chunks).toBe(3);
+    expect(byTitle["notes.md"].chunks).toBe(1);
+  });
+
+  it("returns an empty list for a space with no documents", async () => {
+    const space = await createSpace({ name: "Empty Space" });
+    expect(await listDocuments(space.id)).toEqual([]);
   });
 });

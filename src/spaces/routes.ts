@@ -15,6 +15,7 @@ import {
   getConversation,
   getSpace,
   listConversations,
+  listDocuments,
   listSpaces,
   publicSpace,
   updateCustomPrompt,
@@ -72,6 +73,16 @@ export default async function spacesRoutes(app: FastifyInstance): Promise<void> 
     }
     const updated = await updateCustomPrompt(id, body.prompt);
     return reply.code(200).send({ customPrompt: updated.customPrompt });
+  });
+
+  // List the documents currently indexed in a space (files in context).
+  app.get("/api/spaces/:id/documents", async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const space = await getSpace(id);
+    if (!space) {
+      return reply.code(404).send({ error: "Space not found." });
+    }
+    return listDocuments(id);
   });
 
   // List a space's conversations (R19).
