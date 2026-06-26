@@ -4,6 +4,7 @@ import Fastify from "fastify";
 import fastifyStatic from "@fastify/static";
 import fastifyCookie from "@fastify/cookie";
 import fastifyRateLimit from "@fastify/rate-limit";
+import fastifyMultipart from "@fastify/multipart";
 import { config } from "./config.js";
 import authRoutes from "./auth/routes.js";
 import { registerAuthGuard } from "./auth/guard.js";
@@ -12,6 +13,7 @@ import spacesRoutes from "./spaces/routes.js";
 import connectorsRoutes from "./connectors/routes.js";
 import "./connectors/bootstrap.js"; // populates the connector registry (github, slack)
 import chatRoutes from "./chat/routes.js";
+import uploadsRoutes from "./uploads/routes.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // public/ holds the rewired prototype frontend; in dist builds it sits two levels up.
@@ -22,6 +24,12 @@ export async function buildServer() {
 
   await app.register(fastifyCookie, { secret: config.sessionSecret });
   await app.register(fastifyRateLimit, { global: false });
+  // Multipart for file uploads (U: uploads). Cap each file at 5 MB and a batch
+  // at 20 files; registered before the protected scope so the guarded upload
+  // route can consume `request.parts()`.
+  await app.register(fastifyMultipart, {
+    limits: { fileSize: 5 * 1024 * 1024, files: 20 },
+  });
 
   // Health check (used by docker-compose and U1 verification).
   app.get("/api/health", async () => ({ status: "ok" }));
@@ -37,6 +45,7 @@ export async function buildServer() {
     await protectedScope.register(settingsRoutes); // U5 (absolute /api/settings paths)
     await protectedScope.register(spacesRoutes); // U6 (absolute /api/spaces paths)
     await protectedScope.register(connectorsRoutes); // U7
+    await protectedScope.register(uploadsRoutes); // file uploads
     await protectedScope.register(chatRoutes); // U10
   });
 
