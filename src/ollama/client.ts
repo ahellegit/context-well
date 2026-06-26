@@ -427,6 +427,8 @@ export interface StreamChatOptions {
   model: string;
   messages: ChatMessage[];
   numCtx?: number;
+  // How long Ollama keeps the model loaded after this request (default "30m").
+  keepAlive?: string;
   // Caller-supplied abort signal (e.g. wired to a client disconnect). Aborts the
   // upstream fetch.
   signal?: AbortSignal;
@@ -480,6 +482,10 @@ export async function* streamChat(
     // "thinking" pass adds ~10x latency before the first visible token. We want
     // a fast, direct answer. Models without thinking ignore this flag.
     think: false,
+    // Keep the model resident between turns. Ollama's default (5m) evicts it,
+    // so a chat after a short pause pays a full ~30-40s model reload. A longer
+    // window keeps time-to-first-token at the warm ~0.4s for an active session.
+    keep_alive: opts.keepAlive ?? "30m",
     ...(opts.numCtx ? { options: { num_ctx: opts.numCtx } } : {}),
   };
 
