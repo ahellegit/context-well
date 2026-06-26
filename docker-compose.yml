@@ -24,14 +24,9 @@ services:
     environment:
       # Standalone disk (RocksDB) backend — persisted in the volume below.
       CYBORGDB_DB_TYPE: disk
-      # Both keys are OPTIONAL (see Docker Hub docs):
-      #   CYBORGDB_SERVICE_ROOT_KEY — service auth; UNSET = auth disabled (the
-      #     default here). Set it (and matching CYBORGDB_API_KEY in the app .env)
-      #     to require auth. Blank = disabled, which is fine for local/self-host.
-      #   CYBORGDB_LICENSE_KEY      — cyborgdb-core license; unset = free tier
-      #     (1M items/index). Maps to the service's own CYBORGDB_API_KEY env.
-      CYBORGDB_SERVICE_ROOT_KEY: ${CYBORGDB_API_KEY:-}
-      CYBORGDB_API_KEY: ${CYBORGDB_LICENSE_KEY:-}
+      # Auth is left disabled (no CYBORGDB_SERVICE_ROOT_KEY) and the free tier is
+      # used (no license). Both are optional per the cyborgdb-service docs; add
+      # `CYBORGDB_API_KEY: cyborg_...` here for a paid license if you have one.
     volumes:
       - cyborgdb_data:/app/cyborgdb_data
     healthcheck:

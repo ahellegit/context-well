@@ -51,7 +51,6 @@ vi.mock("cyborgdb", () => {
 vi.mock("../../config.js", () => ({
   config: {
     cyborgdbUrl: "http://localhost:8000",
-    cyborgdbApiKey: "test-key",
   },
 }));
 

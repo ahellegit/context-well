@@ -29,7 +29,6 @@ export interface Config {
   allowRegistration: boolean;
   databaseUrl: string;
   cyborgdbUrl: string;
-  cyborgdbApiKey: string;
   ollamaDefaultUrl: string;
 }
 
@@ -41,10 +40,6 @@ export function loadConfig(): Config {
     allowRegistration: optional("ALLOW_REGISTRATION", "false") === "true",
     databaseUrl: optional("DATABASE_URL", "file:./prisma/dev.db"),
     cyborgdbUrl: required("CYBORGDB_URL"),
-    // Optional: the SDK auth token (the service's CYBORGDB_SERVICE_ROOT_KEY or a
-    // cdbk_ user token). Blank when the service runs with auth disabled — the
-    // default for local/self-hosted use. See .env.example.
-    cyborgdbApiKey: optional("CYBORGDB_API_KEY", ""),
     ollamaDefaultUrl: optional("OLLAMA_DEFAULT_URL", ""),
   };
 }

@@ -15,7 +15,6 @@ const dbFile = join(dir, "test.db");
 process.env.DATABASE_URL = `file:${dbFile}`;
 process.env.SESSION_SECRET ??= "test-session-secret-test-session-secret-0123456789";
 process.env.CYBORGDB_URL ??= "http://localhost:8000";
-process.env.CYBORGDB_API_KEY ??= "test-key";
 process.env.COOKIE_SECURE = "false";
 process.env.ALLOW_REGISTRATION = "false";
 
