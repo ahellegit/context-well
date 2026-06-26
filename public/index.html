@@ -283,7 +283,6 @@
                       <sc-if value="{{ m.isUngrounded }}"><div style="display:flex; align-items:center; gap:6px; margin-bottom:8px; font-size:11px; color:#f59e0b; border:1px solid rgba(245,158,11,0.3); border-radius:6px; padding:4px 9px; width:fit-content;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>{{ m.noticeLine }}</div></sc-if>
                       <span><sc-for list="{{ m.segments }}" as="seg"><sc-if value="{{ seg.isText }}">{{ seg.v }}</sc-if><sc-if value="{{ seg.isInlineCode }}"><code style="font-family:'Geist Mono',monospace;font-size:12px;background:#0e1620;border:1px solid #1f2c3b;border-radius:4px;padding:1px 5px;color:#e8eef5;">{{ seg.v }}</code></sc-if><sc-if value="{{ seg.isCodeBlock }}"><div style="position:relative;margin:10px 0;"><button onClick="{{ seg.copy }}" title="Copy code" style="position:absolute;top:7px;right:7px;display:flex;align-items:center;gap:4px;background:#1a2532;border:1px solid #2a3a4c;border-radius:5px;padding:3px 7px;color:#aebac8;font:500 10px 'Geist';cursor:pointer;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Copy</button><pre style="margin:0;padding:12px 14px;background:#0b1118;border:1px solid #1f2c3b;border-radius:8px;overflow-x:auto;font-family:'Geist Mono',monospace;font-size:12px;line-height:1.55;color:#dbe5f0;white-space:pre;"><code>{{ seg.v }}</code></pre></div></sc-if><sc-if value="{{ seg.isCite }}"><sup style="color:{{ seg.color }};font-family:'Geist Mono',monospace;font-size:10px;cursor:{{ seg.cursor }};">[{{ seg.v }}]</sup></sc-if></sc-for><sc-if value="{{ m.streaming }}"><span style="display:inline-block;width:7px;height:14px;background:#e0454a;margin-left:2px;vertical-align:text-bottom;animation:kl-blink 1s infinite;"></span></sc-if></span>
                       <sc-if value="{{ m.hasSources }}"><div style="display:flex; gap:7px; flex-wrap:wrap; margin-top:10px;"><span style="font-size:11px;color:#768493;border:1px solid #1f2c3b;border-radius:6px;padding:3px 9px;font-family:'Geist Mono',monospace;">{{ m.sourceLine }}</span></div></sc-if>
-                      <sc-if value="{{ m.hasTiming }}"><div title="{{ m.timingLabel }}" style="margin-top:10px;display:flex;flex-direction:column;gap:4px;max-width:320px;"><div style="display:flex;height:5px;border-radius:3px;overflow:hidden;background:#0e1620;"><sc-for list="{{ m.timingBar }}" as="tb"><span title="{{ tb.title }}" style="width:{{ tb.width }};background:{{ tb.color }};display:block;"></span></sc-for></div><span style="font-size:10px;color:#5a6b7d;font-family:'Geist Mono',monospace;letter-spacing:0.02em;">{{ m.timingLabel }}</span></div></sc-if>
                     </sc-if>
                   </div>
                 </div>
@@ -319,6 +318,7 @@
                 <button onClick="{{ send }}" style="width:32px;height:32px;border-radius:7px;background:#e0454a;border:0;display:grid;place-items:center;cursor:pointer;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg></button>
               </sc-if>
             </div>
+            <sc-if value="{{ hasLastTiming }}"><div title="{{ lastTimingLabel }}" style="margin-top:9px; display:flex; align-items:center; gap:9px;"><span style="font-size:9px; letter-spacing:0.09em; text-transform:uppercase; color:#4d5b6b; font-family:'Geist Mono',monospace;">Last reply</span><div style="flex:0 0 110px; display:flex; height:5px; border-radius:3px; overflow:hidden; background:#0e1620;"><sc-for list="{{ lastTimingBar }}" as="tb"><span title="{{ tb.title }}" style="width:{{ tb.width }}; background:{{ tb.color }}; display:block;"></span></sc-for></div><span style="font-size:10px; color:#5a6b7d; font-family:'Geist Mono',monospace;">{{ lastTimingLabel }}</span></div></sc-if>
           </div>
         </div>
 
@@ -997,8 +997,8 @@ class Component extends DCLogic {
     const cited = {}; (doneData.cited||[]).forEach(n=>{ cited[n]=true; });
     const ungrounded = doneData.grounded===false;
     const msgs = this.state.messages.slice();
-    for (let i=msgs.length-1;i>=0;i--){ if (msgs[i].role==='assistant'){ msgs[i]={...msgs[i], text:answer, streaming:false, sources:(doneData.cards||[]), kind: ungrounded?'ungrounded':'normal', timing: doneData.timing||null }; break; } }
-    this.setState({ messages: msgs, streaming:false, loading:false, citedSet: cited });
+    for (let i=msgs.length-1;i>=0;i--){ if (msgs[i].role==='assistant'){ msgs[i]={...msgs[i], text:answer, streaming:false, sources:(doneData.cards||[]), kind: ungrounded?'ungrounded':'normal' }; break; } }
+    this.setState({ messages: msgs, streaming:false, loading:false, citedSet: cited, lastTiming: doneData.timing||null });
   }
   handleStreamError(data) {
     const kind = data.kind || 'error';
@@ -1325,14 +1325,12 @@ class Component extends DCLogic {
       const isUngrounded = m.kind==='ungrounded' || !!m.ungrounded;
       const srcs = m.sources||[];
       const validated = !m.streaming && m.kind==='normal';
-      const tv = (m.timing && !m.streaming && !isError) ? this.timingView(m.timing) : null;
       const errIcon = m.kind==='retrieval-error' ? '#f87171' : (m.kind==='no-sources' ? '#f59e0b' : '#f87171');
       const avgScore = srcs.length ? (srcs.reduce((a,x)=>a+(x.score||0),0)/srcs.length) : 0;
       return {
         isUser:false, isAssistant:true,
         isError, isAnswer: !isError, isUngrounded,
         noticeLine: m.notice || 'Answered from general knowledge — no matching sources in this space.',
-        hasTiming: !!tv, timingBar: tv?tv.bar:[], timingLabel: tv?tv.label:'',
         kind: m.kind, text: m.text, streaming: !!m.streaming,
         segments: this.splitSeg(m.text||'', s.citedSet, validated),
         hasSources: !isError && srcs.length>0 && !m.streaming,
@@ -1358,6 +1356,7 @@ class Component extends DCLogic {
     const hasActiveSpace = !!space;
     const showEmpty = msgs.length===0 && !s.loading && !s.streaming && hasConnectors;
     const showNoConnectors = msgs.length===0 && !s.loading && !s.streaming && hasActiveSpace && !hasConnectors;
+    const lastTV = (s.lastTiming && !s.streaming) ? this.timingView(s.lastTiming) : null;
 
     return {
       // gate: render nothing meaningful until bootstrap resolves
@@ -1412,6 +1411,7 @@ class Component extends DCLogic {
       streaming: s.streaming, notStreaming: !s.streaming,
       draft: s.draft, onDraft:this.onDraft, onKey:this.onKey, send:this.send, stopStream:this.stopStream,
       composerPlaceholder: 'Ask anything grounded in '+(meta.name||'this space')+'…',
+      hasLastTiming: !!lastTV, lastTimingBar: lastTV?lastTV.bar:[], lastTimingLabel: lastTV?lastTV.label:'',
       // rail
       railSubtitle: railSources.length? ('top-k = '+railSources.length+' · ranked by similarity') : 'nothing retrieved yet',
       railSources, showSources: !s.loading && railSources.length>0, showRailHint: !s.loading && railSources.length===0,
