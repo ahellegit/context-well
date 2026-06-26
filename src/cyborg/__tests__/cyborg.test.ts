@@ -30,7 +30,7 @@ const {
     listIds: vi.fn(),
     train: vi.fn(),
     deleteIndex: vi.fn(),
-    getIndexConfig: vi.fn(),
+    getDimension: vi.fn(),
   },
   createIndexMock: vi.fn(),
   loadIndexMock: vi.fn(),
@@ -94,7 +94,7 @@ beforeEach(() => {
   createIndexMock.mockResolvedValue(indexMock);
   loadIndexMock.mockResolvedValue(indexMock);
   generateKeyMock.mockReturnValue(new Uint8Array(32).fill(0xab));
-  indexMock.getIndexConfig.mockResolvedValue({ dimension: EXPECTED_DIMENSION });
+  indexMock.getDimension.mockResolvedValue(EXPECTED_DIMENSION);
   indexMock.upsert.mockResolvedValue({ status: "success" });
   indexMock.query.mockResolvedValue({ results: [] });
   indexMock.delete.mockResolvedValue({ status: "success" });
@@ -155,7 +155,7 @@ describe("openIndex", () => {
     expect(arg.indexName).toBe("my-space");
     expect(arg.indexKey).toBeInstanceOf(Uint8Array);
     expect(arg.indexKey).toHaveLength(32);
-    expect(indexMock.getIndexConfig).toHaveBeenCalled();
+    expect(indexMock.getDimension).toHaveBeenCalled();
   });
 
   it("throws IndexLockedError when the key is missing", async () => {
@@ -173,7 +173,7 @@ describe("openIndex", () => {
   });
 
   it("throws (not IndexLockedError) when dimension !== 384", async () => {
-    indexMock.getIndexConfig.mockResolvedValue({ dimension: 768 });
+    indexMock.getDimension.mockResolvedValue(768);
     await expect(openIndex(space())).rejects.toThrow(/dimension 768/);
     await expect(openIndex(space())).rejects.not.toBeInstanceOf(
       IndexLockedError,

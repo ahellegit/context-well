@@ -25,7 +25,7 @@
     "@langchain/core": "^1.2.1",
     "@prisma/client": "^6.2.1",
     "argon2": "^0.41.1",
-    "cyborgdb": "^0.15.0",
+    "cyborgdb": "^0.17.0",
     "fastify": "^5.2.1"
   },
   "devDependencies": {

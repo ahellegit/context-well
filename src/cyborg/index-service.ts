@@ -10,9 +10,8 @@
 // `metric: "cosine"` (the SDK sets no default) and the embedding model from
 // the Space row (default all-MiniLM-L6-v2 → 384d).
 //
-// NOTE on the dimension guard: the installed cyborgdb SDK (0.15.0) exposes the
-// index dimension via `getIndexConfig().dimension` rather than a standalone
-// `getDimension()`. We read it through that accessor (KTD3 drift guard).
+// NOTE on the dimension guard: the cyborgdb SDK (0.17.0) exposes the index
+// dimension via `getDimension(): Promise<number>` (KTD3 drift guard).
 
 import type { EncryptedIndex, QueryResultItem } from "cyborgdb";
 import { cyborgClient, hexToKey, keyToHex } from "./client.js";
@@ -165,12 +164,11 @@ export async function openIndex(space: SpaceRef): Promise<EncryptedIndex> {
   }
 
   // Dimension drift guard (KTD3): a model swap would corrupt retrieval.
-  // getIndexConfig() is backed by describe(), so a wrong key can also surface
+  // getDimension() is backed by describe(), so a wrong key can also surface
   // here as an auth error — reclassify it as an index-locked condition.
   let dimension: number | null | undefined;
   try {
-    const indexConfig = await index.getIndexConfig();
-    dimension = indexConfig.dimension;
+    dimension = await index.getDimension();
   } catch (error: unknown) {
     if (looksLikeKeyFailure(error)) {
       throw new IndexLockedError(space.slug, error);

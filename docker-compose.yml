@@ -20,7 +20,7 @@ services:
         condition: service_healthy
 
   cyborgdb-service:
-    image: cyborginc/cyborgdb-service:latest
+    image: cyborginc/cyborgdb-service:0.17.0
     environment:
       # The API key the app's SDK client authenticates with (maps to our
       # CYBORGDB_API_KEY in .env).
