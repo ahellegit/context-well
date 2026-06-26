@@ -138,6 +138,24 @@ async function resolveTarget(input: RunTurnInput): Promise<{
   throw new Error("runTurn requires either conversationId or spaceId.");
 }
 
+// How many prior user turns to fold into a follow-up's retrieval query. A small
+// window carries the topic without letting an old subject dominate the embedding.
+const RETRIEVAL_HISTORY_TURNS = 2;
+
+/**
+ * Build the text used for retrieval: the last few user turns plus the current
+ * message. On the first turn (no history) this is just the message. This keeps
+ * follow-up questions grounded in the same material as the turn that set up the
+ * topic, instead of retrieving on the bare follow-up alone.
+ */
+export function buildRetrievalQuery(history: ChatMessage[], userText: string): string {
+  const recentUser = history
+    .filter((m) => m.role === "user")
+    .slice(-RETRIEVAL_HISTORY_TURNS)
+    .map((m) => m.content);
+  return [...recentUser, userText].join("\n");
+}
+
 function toSpaceRef(space: {
   id: string;
   slug: string;
@@ -185,10 +203,13 @@ export async function* runTurn(
   }
 
   // 2. Retrieve. A failure here is R25 — never fall through to Ollama.
+  // Carry recent conversation context into the retrieval query so a follow-up
+  // ("how long does it take?", "what about X?") still retrieves the right
+  // sources instead of embedding the bare, context-free follow-up.
   let hits: CyborgHit[];
   const qStart = Date.now();
   try {
-    hits = await query(spaceRef, input.userText, topK);
+    hits = await query(spaceRef, buildRetrievalQuery(history, input.userText), topK);
   } catch (error) {
     throw new RetrievalError(error);
   }

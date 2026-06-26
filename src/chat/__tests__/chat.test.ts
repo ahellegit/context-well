@@ -45,6 +45,7 @@ const {
   RetrievalError,
   NO_SOURCES_NOTICE,
   DEFAULT_TOP_K,
+  buildRetrievalQuery,
 } = await import("../orchestrator.js");
 const { composePrompt, substituteVars } = await import("../context.js");
 const { validateCitations } = await import("../citations.js");
@@ -423,5 +424,38 @@ describe("runTurn — mid-stream drop (R27)", () => {
     });
     // No partial persistence in v1.
     expect(convo?.messages).toHaveLength(0);
+  });
+});
+
+describe("buildRetrievalQuery — follow-up context carry", () => {
+  it("returns just the message on the first turn (no history)", () => {
+    expect(buildRetrievalQuery([], "What is the canary rollout time?")).toBe(
+      "What is the canary rollout time?",
+    );
+  });
+
+  it("folds the last user turns into a follow-up's retrieval query", () => {
+    const history = [
+      { role: "user", content: "How do I deploy Klavex?" },
+      { role: "assistant", content: "Run `klavex up`." },
+    ] as const;
+    const q = buildRetrievalQuery([...history], "How long does it take?");
+    expect(q).toContain("How do I deploy Klavex?");
+    expect(q).toContain("How long does it take?");
+    // Assistant turns are not folded into the retrieval query.
+    expect(q).not.toContain("klavex up");
+  });
+
+  it("keeps only the most recent user turns (windowed)", () => {
+    const history = [
+      { role: "user", content: "first topic" },
+      { role: "user", content: "second topic" },
+      { role: "user", content: "third topic" },
+    ];
+    const q = buildRetrievalQuery(history, "follow up");
+    expect(q).not.toContain("first topic");
+    expect(q).toContain("second topic");
+    expect(q).toContain("third topic");
+    expect(q).toContain("follow up");
   });
 });
