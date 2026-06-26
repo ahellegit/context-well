@@ -27,8 +27,19 @@ services:
       # Auth is left disabled (no CYBORGDB_SERVICE_ROOT_KEY) and the free tier is
       # used (no license). Both are optional per the cyborgdb-service docs; add
       # `CYBORGDB_API_KEY: cyborg_...` here for a paid license if you have one.
+      # Embedding speed: in online mode the service re-validates the embedding
+      # model against huggingface.co on EVERY query (~2s/query). Once the model
+      # is cached in the hf_cache volume below, set CYBORGDB_HF_OFFLINE=1 in .env
+      # and recreate this service to skip those calls (~2250ms -> ~65ms/query).
+      # Default 0 so a fresh deploy can download the model on first use.
+      # See docs/CYBORGDB-ISSUES.md #1.
+      HF_HUB_OFFLINE: ${CYBORGDB_HF_OFFLINE:-0}
+      TRANSFORMERS_OFFLINE: ${CYBORGDB_HF_OFFLINE:-0}
     volumes:
       - cyborgdb_data:/app/cyborgdb_data
+      # Persist the downloaded embedding model so it survives restarts and so
+      # CYBORGDB_HF_OFFLINE=1 has a populated cache to read from.
+      - cyborgdb_hf_cache:/home/cyborguser/.cache/huggingface
     healthcheck:
       test: ["CMD", "sh", "-c", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/v1/health')\""]
       interval: 10s
@@ -38,3 +49,4 @@ services:
 volumes:
   app_data:
   cyborgdb_data:
+  cyborgdb_hf_cache:
