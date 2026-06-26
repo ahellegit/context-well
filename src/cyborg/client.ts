@@ -8,11 +8,12 @@
 import { Client } from "cyborgdb";
 import { config } from "../config.js";
 
-// Single shared client for the app process. `baseUrl`/`apiKey` come from the
-// validated config (CYBORGDB_URL / CYBORGDB_API_KEY).
+// Single shared client for the app process. `apiKey` is optional — omitted when
+// the service runs with auth disabled (CYBORGDB_SERVICE_ROOT_KEY unset), which
+// is the default for local/self-hosted use.
 export const cyborgClient = new Client({
   baseUrl: config.cyborgdbUrl,
-  apiKey: config.cyborgdbApiKey,
+  apiKey: config.cyborgdbApiKey || undefined,
 });
 
 /**
