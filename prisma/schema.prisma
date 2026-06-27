@@ -1,4 +1,4 @@
-// knowledgeLLM persistence (U2 / KTD2). SQLite for v1, datasource swappable.
+// Context Well persistence (U2 / KTD2). SQLite for v1, datasource swappable.
 // A space's `slug` is its CyborgDB index name (namespace-as-slug). The
 // DocumentVector join table maps documents to vector IDs for correct
 // deletion and resync (R23). JSON-shaped fields are stored as TEXT and

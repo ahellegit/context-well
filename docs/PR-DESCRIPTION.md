@@ -1,7 +1,7 @@
-# feat: knowledgeLLM — self-hosted RAG chat on CyborgDB + Ollama (v1)
+# feat: Context Well — self-hosted RAG chat on CyborgDB + Ollama (v1)
 
 ## Summary
-v1 of knowledgeLLM, a self-hosted vector-grounded LLM chat workspace. A Node/TypeScript + Fastify backend serves the (rewired) HTML prototype, persists app metadata in Prisma/SQLite, stores per-space corpora in CyborgDB (server-side embedding), and streams chat completions from a user-provided Ollama. GitHub and Slack connectors ingest content through a shared plugin interface.
+v1 of Context Well, a self-hosted vector-grounded LLM chat workspace. A Node/TypeScript + Fastify backend serves the (rewired) HTML prototype, persists app metadata in Prisma/SQLite, stores per-space corpora in CyborgDB (server-side embedding), and streams chat completions from a user-provided Ollama. GitHub and Slack connectors ingest content through a shared plugin interface.
 
 - Origin: `docs/brainstorms/2026-06-25-knowledgellm-rag-cyborgdb-requirements.md`
 - Plan: `docs/plans/2026-06-25-001-feat-knowledgellm-rag-cyborgdb-plan.md`

@@ -1,4 +1,4 @@
-# knowledgeLLM stack (R21): the app + cyborgdb-service in standalone/disk mode.
+# Context Well stack (R21): the app + cyborgdb-service in standalone/disk mode.
 # Ollama is external (R22) — set its URL during in-app setup. Inside this
 # network, "localhost" is the container, so point Ollama at host.docker.internal
 # (Mac/Windows) or your host LAN IP. See .env.example.

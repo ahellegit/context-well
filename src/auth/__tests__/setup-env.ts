@@ -9,7 +9,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-const dir = mkdtempSync(join(tmpdir(), "knowledgellm-auth-"));
+const dir = mkdtempSync(join(tmpdir(), "context-well-auth-"));
 const dbFile = join(dir, "test.db");
 
 process.env.DATABASE_URL = `file:${dbFile}`;

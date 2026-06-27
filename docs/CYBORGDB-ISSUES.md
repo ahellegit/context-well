@@ -1,6 +1,6 @@
 # CyborgDB integration issues
 
-Issues hit while building knowledgeLLM on `cyborgdb-service` + the `cyborgdb` (cyborgdb-js) SDK. Kept as feedback for the CyborgDB team and as gotchas for anyone integrating. Versions in play: **`cyborgdb` npm 0.17.0**, **`cyborgdb-service:0.17.0`** (Docker), Node 22, deployed on an NVIDIA GB10 (arm64).
+Issues hit while building Context Well on `cyborgdb-service` + the `cyborgdb` (cyborgdb-js) SDK. Kept as feedback for the CyborgDB team and as gotchas for anyone integrating. Versions in play: **`cyborgdb` npm 0.17.0**, **`cyborgdb-service:0.17.0`** (Docker), Node 22, deployed on an NVIDIA GB10 (arm64).
 
 Severity legend: 🔴 blocks/major perf · 🟠 correctness/DX trap · 🟡 minor/docs.
 
@@ -75,6 +75,6 @@ Severity legend: 🔴 blocks/major perf · 🟠 correctness/DX trap · 🟡 mino
 
 ---
 
-## Deployment notes (knowledgeLLM specifics)
+## Deployment notes (Context Well specifics)
 - The app's `docker-compose.yml` sets `CYBORGDB_DB_TYPE=disk` (standalone/RocksDB). Add `HF_HUB_OFFLINE=1` + `TRANSFORMERS_OFFLINE=1` and persist the HF cache volume for fast embedding (#1, #8).
 - On the spark test box, `cyborgdb-service` was started via a bare `docker run` with **no data volume** and **no `--restart` policy** — vector data lives in the container's writable layer (lost if the container is removed; survives stop/start and reboots only if not pruned). Production should mount a data volume and an HF cache volume, and use `--restart unless-stopped`.

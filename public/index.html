@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Context Well</title>
 <script src="./support.js"></script>
 </head>
 <body>
@@ -33,7 +34,7 @@
     <div style="position:relative; overflow:hidden; border-right:1px solid #1f2c3b; background:radial-gradient(620px 420px at 32% 28%, rgba(224,69,74,0.10), transparent 62%), #070a0e; display:flex; flex-direction:column; justify-content:space-between; padding:40px;">
       <div style="display:flex; align-items:center; gap:11px;">
         <svg width="26" height="26" viewBox="0 0 24 24" fill="none"><circle cx="6" cy="12" r="2.4" fill="#e0454a"/><circle cx="17" cy="6" r="2.4" fill="none" stroke="#e0454a" stroke-width="1.6"/><circle cx="17" cy="18" r="2.4" fill="none" stroke="#e0454a" stroke-width="1.6"/><path d="M8 11 15 7M8 13l7 4" stroke="#e0454a" stroke-width="1.4"/></svg>
-        <div><b style="font-size:15px;">knowledgeLLM</b><div style="font-size:9.5px; color:#768493; letter-spacing:0.12em; text-transform:uppercase; font-family:'Geist Mono',monospace;">vector workspace</div></div>
+        <div><b style="font-size:15px;">Context Well</b><div style="font-size:9.5px; color:#768493; letter-spacing:0.12em; text-transform:uppercase; font-family:'Geist Mono',monospace;">vector workspace</div></div>
       </div>
       <!-- decorative graph (static) -->
       <svg viewBox="0 0 440 360" style="position:absolute; inset:0; width:100%; height:100%; opacity:0.5;">
@@ -50,7 +51,7 @@
       </svg>
       <div style="position:relative; max-width:380px;">
         <div style="font-size:26px; font-weight:600; line-height:1.25; letter-spacing:-0.01em;">Chat grounded in everything your team knows.</div>
-        <div style="font-size:13.5px; color:#768493; margin-top:14px; line-height:1.6;">Connect Slack, Google Docs, GitHub and files. knowledgeLLM indexes them into a private vector space and answers with citations — on the model you choose to run.</div>
+        <div style="font-size:13.5px; color:#768493; margin-top:14px; line-height:1.6;">Connect Slack, Google Docs, GitHub and files. Context Well indexes them into a private vector space and answers with citations — on the model you choose to run.</div>
       </div>
     </div>
 
@@ -108,7 +109,7 @@
           <!-- STEP 2: connect ollama -->
           <sc-if value="{{ setupConnectStep }}">
             <h1 style="font-size:21px; font-weight:600; letter-spacing:-0.01em; margin:0;">Connect Ollama</h1>
-            <p style="font-size:13px; color:#768493; margin:8px 0 22px; line-height:1.55;">Point knowledgeLLM at your Ollama server and choose the chat model used to answer. Embeddings for the vector index are handled by CyborgDB — no embedding model to pick here.</p>
+            <p style="font-size:13px; color:#768493; margin:8px 0 22px; line-height:1.55;">Point Context Well at your Ollama server and choose the chat model used to answer. Embeddings for the vector index are handled by CyborgDB — no embedding model to pick here.</p>
             <label style="display:flex; flex-direction:column; gap:6px;"><span style="font-size:11.5px; color:#aebac8; font-weight:500;">Ollama host</span>
               <div style="display:flex; gap:8px;">
                 <input value="{{ ollamaHost }}" onInput="{{ onHost }}" style="flex:1; background:#0e1620; border:1px solid #2a3a4c; border-radius:9px; padding:11px 13px; color:#e8eef5; font:13px 'Geist Mono',monospace; outline:none;">
@@ -158,7 +159,7 @@
   <aside style="background:#0a1118; border-right:1px solid #1f2c3b; display:flex; flex-direction:column; min-height:0;">
     <div style="padding:16px 16px 12px; display:flex; align-items:center; gap:10px;">
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><circle cx="6" cy="12" r="2.4" fill="#e0454a"/><circle cx="17" cy="6" r="2.4" fill="none" stroke="#e0454a" stroke-width="1.6"/><circle cx="17" cy="18" r="2.4" fill="none" stroke="#e0454a" stroke-width="1.6"/><path d="M8 11 15 7M8 13l7 4" stroke="#e0454a" stroke-width="1.4"/></svg>
-      <div><b style="font-size:14px; letter-spacing:-0.01em;">knowledgeLLM</b><div style="font-size:9.5px; color:#768493; letter-spacing:0.12em; text-transform:uppercase; font-family:'Geist Mono',monospace;">vector workspace</div></div>
+      <div><b style="font-size:14px; letter-spacing:-0.01em;">Context Well</b><div style="font-size:9.5px; color:#768493; letter-spacing:0.12em; text-transform:uppercase; font-family:'Geist Mono',monospace;">vector workspace</div></div>
     </div>
     <div style="padding:0 12px 12px;">
       <button onClick="{{ newChat }}" style="width:100%; display:flex; align-items:center; gap:8px; justify-content:center; background:#e0454a; color:#fff; border:0; border-radius:7px; padding:9px; font:500 13px 'Geist'; cursor:pointer;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>New chat</button>
@@ -168,7 +169,7 @@
     <div style="padding:0 8px; display:flex; flex-direction:column; gap:1px;">
       <sc-for list="{{ spaceList }}" as="sp" hint-placeholder-count="4">
         <div onClick="{{ sp.select }}" style="{{ sp.rowStyle }}">
-          <span style="{{ sp.dotStyle }}"></span>{{ sp.name }}<span style="{{ sp.countStyle }}">{{ sp.count }}</span>
+          <span style="{{ sp.dotStyle }}"></span>{{ sp.name }}<span style="{{ sp.countStyle }}">{{ sp.count }}</span><button onClick="{{ sp.del }}" title="Delete space" style="{{ sp.delStyle }}"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M10 11v6M14 11v6"/></svg></button>
         </div>
       </sc-for>
       <sc-if value="{{ noSpaces }}">
@@ -868,6 +869,25 @@ class Component extends DCLogic {
     this.setState({ spaceId: r.body.id, view:'sources' });
     await this.loadSpaceData(r.body.id);
   }
+  async removeSpace(id, name) {
+    const ok = !window.confirm || window.confirm('Delete "'+name+'"?\n\nThis permanently removes its index, every connected source, and all chats in this space. This cannot be undone.');
+    if (!ok) return;
+    const r = await this.api('/api/spaces/'+id, { method:'DELETE' });
+    if (!r.ok) { this.flash('Could not delete the space.'); return; }
+    // Drop any cached per-space state so nothing dangles after the row is gone.
+    const drop = (m)=>{ const n={ ...m }; delete n[id]; return n; };
+    this.setState({
+      convsBySpace: drop(this.state.convsBySpace),
+      connectorsBySpace: drop(this.state.connectorsBySpace),
+      documentsBySpace: drop(this.state.documentsBySpace),
+      syncingSpaces: drop(this.state.syncingSpaces),
+      activeConvBySpace: drop(this.state.activeConvBySpace),
+      spaceId: this.state.spaceId===id ? null : this.state.spaceId,
+      view: this.state.spaceId===id ? 'chat' : this.state.view,
+    });
+    this.flash('Space deleted · '+name);
+    await this.loadSpaces();
+  }
 
   // ---------- conversations / chat ----------
   parseSources(raw) {
@@ -1326,9 +1346,11 @@ class Component extends DCLogic {
       const chunkTotal = active ? connectorsRaw.reduce((a,c)=>a+(c.chunkCount||0),0) : '';
       return { id:sp.id, name:sp.name, count: active && chunkTotal ? String(chunkTotal) : '',
         select:()=>this.selectSpace(sp.id),
+        del:(e)=>{ if(e&&e.stopPropagation)e.stopPropagation(); this.removeSpace(sp.id, sp.name); },
         rowStyle:'display:flex;align-items:center;gap:9px;padding:7px 10px;border-radius:6px;font-size:13px;cursor:pointer;'+(active?'background:rgba(224,69,74,0.13);color:#e0454a;':'color:#aebac8;background:transparent;'),
         dotStyle:'width:8px;height:8px;border-radius:50%;flex:0 0 auto;background:'+spaceColor+';'+(active?'box-shadow:0 0 0 3px rgba(224,69,74,0.18);':''),
-        countStyle:'margin-left:auto;font-size:11px;font-family:\'Geist Mono\',monospace;color:'+(active?'#768493':'#4d5b6b')+';' };
+        countStyle:'margin-left:auto;font-size:11px;font-family:\'Geist Mono\',monospace;color:'+(active?'#768493':'#4d5b6b')+';',
+        delStyle:'flex:0 0 auto;width:18px;height:18px;padding:0;border-radius:4px;background:transparent;border:0;color:'+(active?'#c98a8c':'#4d5b6b')+';cursor:pointer;display:grid;place-items:center;' };
     });
 
     // connectors (sources view)
