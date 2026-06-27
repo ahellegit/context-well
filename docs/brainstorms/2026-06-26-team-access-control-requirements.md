@@ -152,10 +152,8 @@ CyborgDB's whole pitch is encrypted, access-gated search, and it ships native RB
 
 ## Outstanding Questions
 
-### Resolve before planning
-- **Does editor-triggered CyborgDB `train` require a client-side root key?** Training is root-only and fires once a corpus crosses a threshold. If the service trains internally (it holds the keys), editors ingest with only a write token and nothing stalls. If a client-side root call is required, then ingestion by an editor while no admin is logged in cannot complete — which would force either keeping root standing-available (collapsing the least-privilege design) or gating/deferring ingestion to admin presence. This is load-bearing for the whole architecture.
-
 ### Deferred to planning
+- **Does editor-triggered CyborgDB `train` require a client-side root key?** (Load-bearing — verify first.) Training is root-only and fires once a corpus crosses a threshold. If the service trains internally (it holds the keys), editors ingest with only a write token and nothing stalls. If a client-side root call is required, then ingestion by an editor while no admin is logged in cannot complete — forcing either a standing-available root key (collapsing the least-privilege design) or gating/deferring ingestion to admin presence. Planning must confirm this against the `cyborgdb-js` 0.17.0 surface before committing the architecture. Logged as a CyborgDB DX gap in [docs/CYBORGDB-ISSUES.md](docs/CYBORGDB-ISSUES.md) (#11).
 - KDF/KEK derivation and envelope format for password-wrapping (root key and per-user tokens).
 - Where wrapped envelopes and wrapped tokens live (new tables vs `SystemSetting`), and the schema for memberships/roles.
 - Migration of existing spaces' plaintext `Space.indexKey` into the new model (re-key vs wrap-in-place).

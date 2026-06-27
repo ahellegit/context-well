@@ -73,6 +73,13 @@ Severity legend: 🔴 blocks/major perf · 🟠 correctness/DX trap · 🟡 mino
 - **Symptom:** `cyborgdb.co/docs` 404s; the embedding-model configuration page wasn't in the `docs.cyborg.co/llms.txt` index.
 - **Fix / workaround:** Real docs live at `docs.cyborg.co`; Docker Hub README is the most useful source for env vars.
 
+## 11. 🟠 Unclear whether `train` is client-side root-only or service-internal under RBAC
+- **Symptom:** While designing per-space access control (admin-held root key, per-user `cdbk_` read/write tokens), it was **not obvious** from the docs/SDK whether index **training** requires a client-side root key, or whether the service trains internally once a corpus crosses its threshold.
+- **Why it matters:** It's load-bearing for any least-privilege RBAC design. If `train` needs a client-side root key, then an **editor** (write token, no root) ingesting enough to trigger training cannot complete the operation unless a root holder is also present — which forces either keeping the root key standing-available (defeating the point of password-wrapping it) or gating/deferring ingestion to admin presence. If training is service-internal, a plain write token is sufficient and the design is clean.
+- **What's also unclear:** The per-index user-token surface generally — exact mint/list/revoke calls, how read vs write scope is expressed, and revocation semantics (does a revoked token fail immediately?) — wasn't obvious enough to design against without reading the SDK source.
+- **Fix / workaround:** TBD — to be confirmed against `cyborgdb-js` 0.17.0 source / `cyborgdb-service` at planning time.
+- **Upstream:** Document, per RBAC operation, whether it is root-only client-side vs service-internal — especially `train` — and publish a clear example of the per-index user-token lifecycle (mint read/write, list, revoke).
+
 ---
 
 ## Deployment notes (Context Well specifics)
