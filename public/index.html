@@ -649,19 +649,23 @@
       </div>
       <div style="flex:1; overflow-y:auto; min-height:0; padding:20px 0;">
         <div style="max-width:760px; margin:0 auto; padding:0 26px;">
-          <p style="color:#768493; font-size:12.5px; line-height:1.6; margin:0 0 16px;">Pick who can reach this space. <b style="color:#aebac8;">Viewer</b> = chat &amp; read; <b style="color:#aebac8;">Editor</b> = also ingest &amp; manage sources. Owners and admins always have access, so only member accounts are listed here.</p>
+          <p style="color:#768493; font-size:12.5px; line-height:1.6; margin:0 0 16px;">Pick who can reach this space. <b style="color:#aebac8;">Viewer</b> = chat &amp; read; <b style="color:#aebac8;">Editor</b> = also ingest &amp; manage sources. Owners and admins always have full access.</p>
           <sc-for list="{{ accessRows }}" as="a" hint-placeholder-count="4">
-            <div style="display:flex; align-items:center; gap:11px; padding:11px 14px; border:1px solid #1f2c3b; border-radius:10px; margin-bottom:8px; background:#0a1118;">
+            <div style="display:flex; align-items:center; gap:12px; padding:11px 14px; border:1px solid #1f2c3b; border-radius:10px; margin-bottom:8px; background:#0a1118;">
               <span style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#60a5fa,#a78bfa);display:grid;place-items:center;font-size:10px;font-weight:600;color:rgba(0,0,0,0.78);flex:0 0 auto;">{{ a.initials }}</span>
-              <span style="flex:1; min-width:0; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ a.email }}</span>
-              <span onClick="{{ a.setNone }}" style="{{ a.noneStyle }}">none</span>
-              <span onClick="{{ a.setViewer }}" style="{{ a.viewerStyle }}">viewer</span>
-              <span onClick="{{ a.setEditor }}" style="{{ a.editorStyle }}">editor</span>
+              <span style="flex:1; min-width:0; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ a.email }}<span style="color:#768493;">{{ a.nameSuffix }}</span></span>
+              <sc-if value="{{ a.isWsAdmin }}">
+                <span style="{{ a.wsBadgeStyle }}">{{ a.wsBadge }}</span>
+              </sc-if>
+              <sc-if value="{{ a.isMember }}">
+                <span style="display:inline-flex;">
+                  <span onClick="{{ a.setNone }}" style="{{ a.noneStyle }}">None</span>
+                  <span onClick="{{ a.setViewer }}" style="{{ a.viewerStyle }}">Viewer</span>
+                  <span onClick="{{ a.setEditor }}" style="{{ a.editorStyle }}">Editor</span>
+                </span>
+              </sc-if>
             </div>
           </sc-for>
-          <sc-if value="{{ noAccessUsers }}">
-            <div style="padding:28px; text-align:center; color:#4d5b6b; font-size:12.5px; line-height:1.6; border:1px dashed #1f2c3b; border-radius:10px;">No member accounts yet.<br>Create accounts in <b style="color:#768493;">Members &amp; access</b>, then grant them here.</div>
-          </sc-if>
         </div>
       </div>
     </sc-if>
@@ -1052,20 +1056,25 @@ class Component extends DCLogic {
     ]);
     const roles = {};
     if (mem.ok && Array.isArray(mem.body)) mem.body.forEach(m=>{ roles[m.userId]=m.role; });
-    // Only plain members are granted per-space access; owners/admins reach all.
-    const candidates = (users.ok && Array.isArray(users.body) ? users.body : []).filter(u=>u.workspaceRole==='member');
-    this.setState({ accessBusy:false, accessRoles:roles, accessUsers:candidates.map(u=>({ id:u.id, email:u.email })) });
+    // Show everyone, including the current user. Owners/admins reach all spaces
+    // (shown as full-access, not editable); members get per-space role controls.
+    const all = (users.ok && Array.isArray(users.body) ? users.body : [])
+      .map(u=>({ id:u.id, email:u.email, workspaceRole:u.workspaceRole }));
+    this.setState({ accessBusy:false, accessRoles:roles, accessUsers:all });
   }
-  // Set or clear a user's role on the open space ('' removes access).
+  // Set or clear a member's role on the open space ('' removes access), with a
+  // success toast so the change is confirmed.
   async setAccess(userId, role){
     const sid = this.state.accessSpaceId;
     if (!sid) return;
+    const who = (this.state.accessUsers.find(u=>u.id===userId)||{}).email || 'member';
     let r;
     if (role==='') r = await this.api('/api/members/'+userId+'/roles/'+sid, { method:'DELETE' });
     else r = await this.apiJson('/api/members/'+userId+'/roles', { method:'POST', body: JSON.stringify({ spaceId: sid, role }) });
-    if (!r.ok) { this.flash('Could not update access.'); return; }
+    if (!r.ok) { this.flash('Could not update access for '+who+'.'); return; }
     await this.loadAccess();
     await this.loadMembers();
+    this.flash(role==='' ? (who+' · access removed') : (who+' · now '+role));
   }
 
   // ---------- setup wizard ----------
@@ -1800,12 +1809,24 @@ class Component extends DCLogic {
     const adminCount = s.members.filter(m=>m.workspaceRole==='owner'||m.workspaceRole==='admin').length;
 
     // Per-space access modal rows: each member user with a None/Viewer/Editor pill.
-    const accessPill = (on, color) => 'display:inline-block;font-size:11px;font-family:\'Geist Mono\',monospace;border-radius:999px;padding:3px 11px;cursor:pointer;margin-left:6px;'+(on?('color:'+color+';border:1px solid '+color+'55;background:'+color+'22;'):'color:#4d5b6b;border:1px solid #2a3a4c;background:transparent;');
+    // Segmented control: 3 joined cells (None | Viewer | Editor); active is filled.
+    const seg = (active, color, pos) => {
+      const radius = pos==='l' ? 'border-radius:7px 0 0 7px;' : (pos==='r' ? 'border-radius:0 7px 7px 0;' : '');
+      const overlap = pos==='l' ? '' : 'margin-left:-1px;';
+      return 'display:inline-block;font-size:11.5px;font-family:\'Geist Mono\',monospace;padding:5px 13px;cursor:pointer;border:1px solid '+(active?color:'#2a3a4c')+';'+radius+overlap+(active?('color:#06121a;background:'+color+';font-weight:600;position:relative;z-index:1;'):'color:#768493;background:#0a1118;');
+    };
     const accessRows = s.accessUsers.map(u => {
       const role = s.accessRoles[u.id] || '';
+      const ws = u.workspaceRole || 'member';
+      const isWsAdmin = ws==='owner' || ws==='admin';
+      const isSelf = u.email === s.userEmail;
       return {
         userId:u.id, email:u.email, initials:(u.email||'?').slice(0,2).toUpperCase(),
-        noneStyle: accessPill(role==='', '#768493'), viewerStyle: accessPill(role==='viewer', '#60a5fa'), editorStyle: accessPill(role==='editor', '#2dd4bf'),
+        isWsAdmin, isMember: !isWsAdmin, isSelf,
+        nameSuffix: isSelf ? ' (you)' : '',
+        wsBadge: ws==='owner' ? 'Owner · full access' : 'Admin · full access',
+        wsBadgeStyle: 'font-size:10.5px;font-family:\'Geist Mono\',monospace;color:#a78bfa;border:1px solid rgba(167,139,250,0.35);background:rgba(167,139,250,0.12);border-radius:999px;padding:3px 11px;',
+        noneStyle: seg(role==='', '#768493', 'l'), viewerStyle: seg(role==='viewer', '#60a5fa', 'm'), editorStyle: seg(role==='editor', '#2dd4bf', 'r'),
         setNone: ()=>this.setAccess(u.id, ''), setViewer: ()=>this.setAccess(u.id, 'viewer'), setEditor: ()=>this.setAccess(u.id, 'editor'),
       };
     });
