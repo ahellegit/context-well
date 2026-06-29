@@ -305,6 +305,17 @@ describe("connectorsRoutes credential masking", () => {
 
   beforeEach(async () => {
     app = Fastify();
+    // Stub the post-auth principal the protected scope would attach; an owner
+    // passes the U3 route guards so this test can assert credential masking.
+    app.addHook("preHandler", async (req) => {
+      req.user = {
+        id: "test-owner",
+        email: "owner@test.local",
+        createdAt: new Date(),
+        workspaceRole: "owner",
+        mustChangePassword: false,
+      };
+    });
     await app.register(connectorsRoutes);
     await app.ready();
   });

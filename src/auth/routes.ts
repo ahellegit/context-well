@@ -8,6 +8,7 @@ import type { FastifyInstance, FastifyReply } from "fastify";
 import { config } from "../config.js";
 import {
   DuplicateEmailError,
+  changePassword,
   createSession,
   destroySession,
   isFirstAccount,
@@ -72,22 +73,30 @@ function readSessionId(request: { cookies: Record<string, string | undefined>; u
 }
 
 export default async function authRoutes(app: FastifyInstance): Promise<void> {
-  // POST /register — create an account. Bootstrap-then-gated policy (R29):
-  // the first account always succeeds; later ones require config.allowRegistration.
+  // GET /bootstrap-status — public. Tells the client whether the workspace still
+  // needs its first (owner) account, so the auth screen shows "create owner" vs
+  // "sign in" without a user-facing register toggle (R9).
+  app.get("/bootstrap-status", async () => {
+    return { needsBootstrap: await isFirstAccount() };
+  });
+
+  // POST /register — bootstrap-only (R9). The very first account creates the
+  // workspace owner and is logged straight in. Once any user exists this route
+  // is closed (403) regardless of any config flag; further accounts come only
+  // from the admin Members flow.
   app.post("/register", { config: credentialRateLimit }, async (request, reply) => {
     const creds = parseCredentials(request.body);
     if (!creds) {
       return reply.code(400).send({ error: "invalid_credentials" });
     }
 
-    const first = await isFirstAccount();
-    if (!first && !config.allowRegistration) {
-      return reply.code(403).send({ error: "registration_disabled" });
+    if (!(await isFirstAccount())) {
+      return reply.code(403).send({ error: "registration_closed" });
     }
 
     try {
       const user = await register(creds.email, creds.password);
-      // Log the new user straight in with a fresh session.
+      // Log the new owner straight in with a fresh session.
       const sessionId = await createSession(user.id);
       setSessionCookie(reply, sessionId);
       return reply.code(201).send({ user });
@@ -137,5 +146,32 @@ export default async function authRoutes(app: FastifyInstance): Promise<void> {
       return reply.code(401).send({ error: "unauthorized" });
     }
     return reply.code(200).send({ user });
+  });
+
+  // POST /change-password — rotate the caller's password (R10). Lives in the
+  // public auth scope and does its own session check, so a user flagged
+  // `mustChangePassword` (blocked from every protected route) can still reach it.
+  // Rate-limited like the other credential endpoints.
+  app.post("/change-password", { config: credentialRateLimit }, async (request, reply) => {
+    const sessionId = readSessionId(request);
+    const me = sessionId ? await validateSession(sessionId) : null;
+    if (!me) {
+      return reply.code(401).send({ error: "unauthorized" });
+    }
+
+    const body = request.body;
+    if (typeof body !== "object" || body === null) {
+      return reply.code(400).send({ error: "invalid_request" });
+    }
+    const { currentPassword, newPassword } = body as { currentPassword?: unknown; newPassword?: unknown };
+    if (typeof currentPassword !== "string" || typeof newPassword !== "string" || newPassword.length < 8) {
+      return reply.code(400).send({ error: "invalid_request" });
+    }
+
+    const updated = await changePassword(me.id, currentPassword, newPassword);
+    if (!updated) {
+      return reply.code(401).send({ error: "invalid_credentials" });
+    }
+    return reply.code(200).send({ user: updated });
   });
 }

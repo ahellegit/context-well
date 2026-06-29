@@ -77,7 +77,23 @@
             <div style="margin-top:12px; font-size:12px; color:#f87171; background:rgba(248,113,113,0.08); border:1px solid rgba(248,113,113,0.28); border-radius:8px; padding:9px 11px; line-height:1.5;">{{ authError }}</div>
           </sc-if>
           <button onClick="{{ submitAuth }}" style="{{ authBtnStyle }}">{{ authBtnLabel }}</button>
-          <div style="display:flex; justify-content:center; margin-top:16px; font-size:12px;"><span style="color:#768493;">{{ authSwitchPrefix }} <span onClick="{{ toggleAuthMode }}" style="color:#e0454a; cursor:pointer;">{{ authSwitchAction }}</span></span></div>
+        </div>
+      </sc-if>
+
+      <!-- FORCED FIRST-LOGIN PASSWORD CHANGE -->
+      <sc-if value="{{ isChangePw }}">
+        <div style="margin:auto; width:380px; max-width:88%; padding:48px 0;">
+          <h1 style="font-size:22px; font-weight:600; letter-spacing:-0.01em; margin:0;">Set a new password</h1>
+          <p style="font-size:13px; color:#768493; margin:8px 0 28px;">Your account was created with a temporary password. Choose a new one to continue.</p>
+          <div style="display:flex; flex-direction:column; gap:12px;">
+            <label style="display:flex; flex-direction:column; gap:6px;"><span style="font-size:11.5px; color:#aebac8; font-weight:500;">Temporary password</span><input value="{{ cpCurrent }}" onInput="{{ onCpCurrent }}" type="password" placeholder="••••••••••" style="background:#0e1620; border:1px solid #2a3a4c; border-radius:9px; padding:11px 13px; color:#e8eef5; font:13.5px 'Geist'; outline:none;"></label>
+            <label style="display:flex; flex-direction:column; gap:6px;"><span style="font-size:11.5px; color:#aebac8; font-weight:500;">New password</span><input value="{{ cpNew }}" onInput="{{ onCpNew }}" type="password" placeholder="at least 8 characters" style="background:#0e1620; border:1px solid #2a3a4c; border-radius:9px; padding:11px 13px; color:#e8eef5; font:13.5px 'Geist'; outline:none;"></label>
+            <label style="display:flex; flex-direction:column; gap:6px;"><span style="font-size:11.5px; color:#aebac8; font-weight:500;">Confirm new password</span><input value="{{ cpConfirm }}" onInput="{{ onCpConfirm }}" type="password" placeholder="re-enter new password" style="background:#0e1620; border:1px solid #2a3a4c; border-radius:9px; padding:11px 13px; color:#e8eef5; font:13.5px 'Geist'; outline:none;"></label>
+          </div>
+          <sc-if value="{{ cpError }}">
+            <div style="margin-top:12px; font-size:12px; color:#f87171; background:rgba(248,113,113,0.08); border:1px solid rgba(248,113,113,0.28); border-radius:8px; padding:9px 11px; line-height:1.5;">{{ cpError }}</div>
+          </sc-if>
+          <button onClick="{{ submitChangePassword }}" style="{{ cpBtnStyle }}">{{ cpBtnLabel }}</button>
         </div>
       </sc-if>
 
@@ -193,9 +209,15 @@
       </sc-if>
     </div>
 
-    <div style="margin-top:auto; padding:12px; border-top:1px solid #1f2c3b; display:flex; align-items:center; gap:10px;">
+    <sc-if value="{{ canManageMembers }}">
+      <div style="margin-top:auto; padding:4px 8px 0;">
+        <button onClick="{{ goMembers }}" style="{{ navMembers.style }}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="{{ navMembers.icon }}" stroke-width="1.7"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>Members &amp; access</button>
+      </div>
+    </sc-if>
+
+    <div style="{{ userFooterStyle }}">
       <span style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#fb7185,#f59e0b);display:grid;place-items:center;font-size:11px;font-weight:600;color:rgba(0,0,0,0.78);flex:0 0 auto;">{{ userInitials }}</span>
-      <div style="flex:1;min-width:0;"><b style="font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;">{{ userEmail }}</b><div style="font-size:10.5px;color:#768493;">workspace member</div></div>
+      <div style="flex:1;min-width:0;"><b style="font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;">{{ userEmail }}</b><div style="font-size:10.5px;color:#768493;">{{ workspaceRoleLabel }}</div></div>
       <button onClick="{{ logout }}" title="Sign out" style="width:26px;height:26px;border-radius:6px;background:transparent;border:0;color:#768493;cursor:pointer;display:grid;place-items:center;flex:0 0 auto;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg></button>
     </div>
   </aside>
@@ -553,51 +575,57 @@
       </div>
     </sc-if>
 
-    <!-- MEMBERS VIEW -->
+    <!-- MEMBERS VIEW (admin/owner only) -->
     <sc-if value="{{ isMembers }}">
       <div style="height:54px; border-bottom:1px solid #1f2c3b; display:flex; align-items:center; gap:10px; padding:0 22px; flex:0 0 auto;">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#e0454a" stroke-width="1.8"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
         <b style="font-size:14px;">Members &amp; access</b>
-        <span style="font-size:11px; color:#768493; font-family:'Geist Mono',monospace;">· org‑wide · click any cell to change role</span>
-        <span style="margin-left:auto; display:inline-flex;align-items:center;gap:7px;font-size:12px;color:#fff;background:#e0454a;border-radius:7px;padding:6px 12px;cursor:pointer;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Invite</span>
+        <span style="font-size:11px; color:#768493; font-family:'Geist Mono',monospace;">· click a space cell to cycle no-access → viewer → editor</span>
+        <span onClick="{{ openInvite }}" style="margin-left:auto; display:inline-flex;align-items:center;gap:7px;font-size:12px;color:#fff;background:#e0454a;border-radius:7px;padding:6px 12px;cursor:pointer;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>New account</span>
       </div>
-      <div style="padding:12px 22px; display:flex; gap:14px; align-items:center; border-bottom:1px solid #1f2c3b; font-family:'Geist Mono',monospace; font-size:10.5px; flex:0 0 auto;">
-        <span style="color:#768493;">ROLES:</span>
-        <span style="color:#a78bfa;border:1px solid rgba(167,139,250,0.3);background:rgba(167,139,250,0.1);border-radius:999px;padding:2px 9px;">OWNER</span>
-        <span style="color:#60a5fa;border:1px solid rgba(96,165,250,0.3);background:rgba(96,165,250,0.1);border-radius:999px;padding:2px 9px;">ADMIN</span>
-        <span style="color:#2dd4bf;border:1px solid rgba(45,212,191,0.3);background:rgba(45,212,191,0.1);border-radius:999px;padding:2px 9px;">EDITOR</span>
-        <span style="color:#768493;border:1px solid #38495c;background:rgba(118,132,147,0.1);border-radius:999px;padding:2px 9px;">VIEWER</span>
-      </div>
+      <sc-if value="{{ secondAdminNudge }}">
+        <div style="margin:12px 22px 0; padding:11px 14px; display:flex; align-items:center; gap:10px; font-size:12.5px; color:#f5c451; background:rgba(245,196,81,0.08); border:1px solid rgba(245,196,81,0.28); border-radius:9px;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#f5c451" stroke-width="1.8"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0zM12 9v4M12 17h.01"/></svg>
+          <span style="flex:1;">Only one admin exists. A sole admin who loses their password can't be recovered — promote a second person to admin.</span>
+          <span onClick="{{ dismissNudge }}" style="color:#768493; cursor:pointer; font-size:11.5px;">Dismiss</span>
+        </div>
+      </sc-if>
       <div style="flex:1; overflow-y:auto; min-height:0;">
         <table style="width:100%; border-collapse:collapse; font-size:13px;">
           <thead>
             <tr style="border-bottom:1px solid #1f2c3b;">
               <th style="text-align:left; padding:13px 22px; font-size:10px; color:#768493; font-weight:500; letter-spacing:0.08em; text-transform:uppercase; font-family:'Geist Mono',monospace;">Member</th>
+              <th style="text-align:center; padding:13px 10px; font-size:10px; color:#768493; font-weight:500; letter-spacing:0.08em; text-transform:uppercase; font-family:'Geist Mono',monospace;">Workspace</th>
               <sc-for list="{{ matrixSpaces }}" as="ms"><th style="text-align:center; padding:13px 10px; font-size:11px; font-weight:500; color:#e8eef5;"><span style="display:inline-flex;align-items:center;gap:6px;"><span style="width:7px;height:7px;border-radius:50%;background:{{ ms.color }};"></span>{{ ms.name }}</span></th></sc-for>
-              <th style="text-align:right; padding:13px 22px; font-size:10px; color:#768493; font-weight:500; letter-spacing:0.08em; text-transform:uppercase; font-family:'Geist Mono',monospace;">2FA</th>
+              <th style="text-align:right; padding:13px 22px; font-size:10px; color:#768493; font-weight:500; letter-spacing:0.08em; text-transform:uppercase; font-family:'Geist Mono',monospace;">Actions</th>
             </tr>
           </thead>
           <tbody>
-            <sc-for list="{{ matrixRows }}" as="r" hint-placeholder-count="6">
+            <sc-for list="{{ matrixRows }}" as="r" hint-placeholder-count="4">
               <tr style="border-bottom:1px solid #1f2c3b;">
                 <td style="padding:12px 22px;">
                   <div style="display:flex;align-items:center;gap:10px;">
-                    <sc-if value="{{ r.isAgent }}"><span style="width:28px;height:28px;border-radius:50%;background:rgba(224,69,74,0.13);border:1px dashed rgba(224,69,74,0.36);display:grid;place-items:center;flex:0 0 auto;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#e0454a" stroke-width="1.7"><path d="M12 6V3M9 8h6a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2ZM3 14h2M19 14h2"/></svg></span></sc-if>
-                    <sc-if value="{{ r.notAgent }}"><span style="width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-size:10px;font-weight:600;color:rgba(0,0,0,0.78);flex:0 0 auto;background:{{ r.grad }};">{{ r.initials }}</span></sc-if>
+                    <span style="width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-size:10px;font-weight:600;color:rgba(0,0,0,0.78);flex:0 0 auto;background:{{ r.grad }};">{{ r.initials }}</span>
                     <div><b style="font-size:13px;font-weight:500;">{{ r.name }}</b><div style="font-size:10px;color:#768493;font-family:'Geist Mono',monospace;">{{ r.email }}</div></div>
+                    <sc-if value="{{ r.pending }}"><span style="font-size:9.5px;color:#f5c451;border:1px solid rgba(245,196,81,0.3);border-radius:999px;padding:1px 7px;font-family:'Geist Mono',monospace;">PENDING</span></sc-if>
                   </div>
                 </td>
+                <td style="text-align:center;"><span style="{{ r.wsStyle }}">{{ r.wsLabel }}</span></td>
                 <sc-for list="{{ r.cells }}" as="c">
                   <td style="text-align:center;"><span onClick="{{ c.click }}" style="{{ c.style }}">{{ c.label }}</span></td>
                 </sc-for>
-                <td style="text-align:right; padding:12px 22px; font-family:'Geist Mono',monospace;"><span style="font-size:11px;color:{{ r.twofaColor }};">{{ r.twofa }}</span></td>
+                <td style="text-align:right; padding:12px 22px; white-space:nowrap;">
+                  <span onClick="{{ r.reset }}" style="font-size:11px;color:#768493;cursor:pointer;margin-right:12px;">Reset pw</span>
+                  <sc-if value="{{ r.canPromote }}"><span onClick="{{ r.promote }}" style="font-size:11px;color:#60a5fa;cursor:pointer;">Make admin</span></sc-if>
+                  <sc-if value="{{ r.canDemote }}"><span onClick="{{ r.demote }}" style="font-size:11px;color:#f87171;cursor:pointer;">Demote</span></sc-if>
+                </td>
               </tr>
             </sc-for>
           </tbody>
         </table>
         <div style="padding:14px 22px; display:flex; align-items:center; gap:8px; font-size:11.5px; color:#768493;">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#e0454a" stroke-width="1.8"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/></svg>
-          Agents inherit a role no higher than their creator's, and can never exceed Viewer in a space they weren't explicitly granted.
+          Owners and admins reach every space. Editors ingest and manage sources; viewers chat and read.
         </div>
       </div>
     </sc-if>
@@ -662,6 +690,39 @@
   </div>
 </sc-if>
 
+<!-- ========= NEW ACCOUNT / TEMP PASSWORD ========= -->
+<sc-if value="{{ inviteOpen }}">
+  <div onClick="{{ closeInvite }}" style="position:fixed; inset:0; background:rgba(2,6,11,0.65); backdrop-filter:blur(4px); display:grid; place-items:center; z-index:100; padding:20px;">
+    <div onClick="{{ stop }}" style="width:460px; max-width:100%; background:#0a1118; border:1px solid #2a3a4c; border-radius:16px; box-shadow:0 24px 64px rgba(0,0,0,0.6); overflow:hidden;">
+      <sc-if value="{{ inviteFormOpen }}">
+        <div style="padding:22px 22px 6px; display:flex; align-items:flex-start; gap:13px;">
+          <span style="width:34px;height:34px;border-radius:8px;background:rgba(224,69,74,0.13);display:grid;place-items:center;flex:0 0 auto;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#e0454a" stroke-width="1.9"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM19 8v6M22 11h-6"/></svg></span>
+          <div style="flex:1;"><h3 style="font-size:15.5px; font-weight:600; margin:0;">New account</h3><p style="color:#768493; font-size:12.5px; margin:6px 0 0; line-height:1.55;">Creates a member with a one-time temporary password. They'll set their own on first sign-in. Grant space access from the table afterward.</p></div>
+        </div>
+        <div style="padding:14px 22px 4px;">
+          <input value="{{ inviteEmail }}" onInput="{{ onInviteEmail }}" autofocus placeholder="person@team.dev" style="width:100%; background:#070a0e; border:1px solid #2a3a4c; border-radius:10px; padding:12px 14px; color:#e8eef5; font:14px 'Geist'; outline:none;">
+        </div>
+        <div style="padding:14px 22px 18px; display:flex; gap:8px; justify-content:flex-end;">
+          <button onClick="{{ closeInvite }}" style="font-size:13px; color:#aebac8; background:#0e1620; border:1px solid #1f2c3b; border-radius:7px; padding:9px 15px; cursor:pointer;">Cancel</button>
+          <button onClick="{{ submitInvite }}" style="{{ inviteBtnStyle }}">{{ inviteBtnLabel }}</button>
+        </div>
+      </sc-if>
+      <sc-if value="{{ inviteHasResult }}">
+        <div style="padding:22px 22px 6px; display:flex; align-items:flex-start; gap:13px;">
+          <span style="width:34px;height:34px;border-radius:8px;background:rgba(34,197,94,0.14);display:grid;place-items:center;flex:0 0 auto;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+          <div style="flex:1;"><h3 style="font-size:15.5px; font-weight:600; margin:0;">{{ inviteResultTitle }}</h3><p style="color:#768493; font-size:12.5px; margin:6px 0 0; line-height:1.55;">Share this one-time temporary password with <b style="color:#aebac8;">{{ inviteResultEmail }}</b> over a trusted channel. It won't be shown again.</p></div>
+        </div>
+        <div style="padding:14px 22px 4px;">
+          <div style="background:#070a0e; border:1px solid #2a3a4c; border-radius:10px; padding:13px 14px; color:#2dd4bf; font:14px 'Geist Mono',monospace; word-break:break-all; user-select:all;">{{ inviteResultPw }}</div>
+        </div>
+        <div style="padding:14px 22px 18px; display:flex; gap:8px; justify-content:flex-end;">
+          <button onClick="{{ closeInvite }}" style="font-size:13px; color:#fff; background:#e0454a; border:0; border-radius:7px; padding:9px 16px; cursor:pointer;">Done</button>
+        </div>
+      </sc-if>
+    </div>
+  </div>
+</sc-if>
+
 <!-- ========= TOAST ========= -->
 <sc-if value="{{ toast }}">
   <div style="position:fixed; bottom:20px; right:20px; z-index:200; background:#131c28; border:1px solid #38495c; border-radius:8px; padding:10px 14px 10px 11px; font-size:13px; box-shadow:0 8px 24px rgba(0,0,0,0.4); display:flex; align-items:center; gap:9px;">
@@ -699,11 +760,20 @@ class Component extends DCLogic {
     this.state = {
       // bootstrap / auth
       ready: false,                 // /me + /settings resolved
-      stage: 'login',               // 'login' | 'setup' | 'app'
-      authMode: 'login',            // 'login' | 'register'
+      stage: 'login',               // 'login' | 'changePassword' | 'setup' | 'app'
+      authMode: 'login',            // 'login' | 'register' (register only at bootstrap)
+      needsBootstrap: false,        // true until the first (owner) account exists
       email: '', password: '',
       authError: '', authBusy: false,
       userEmail: '',
+      userRole: 'member',           // workspaceRole from /me: owner | admin | member
+      // forced first-login password change
+      cpCurrent: '', cpNew: '', cpConfirm: '', cpError: '', cpBusy: false,
+      // members & access (admin)
+      members: [],                  // [{id,email,workspaceRole,memberships:[{spaceId,role}]}]
+      membersBusy: false,
+      inviteOpen: false, inviteEmail: '', inviteBusy: false, inviteResult: null,
+      nudgeDismissed: false,
       // setup wizard
       setupStep: 'provider',        // 'provider' | 'connect'
       provider: 'ollama',
@@ -749,7 +819,10 @@ class Component extends DCLogic {
     };
     // bind handlers
     [
-      'onEmail','onPassword','onAuthKey','submitAuth','toggleAuthMode','logout',
+      'onEmail','onPassword','onAuthKey','submitAuth','logout',
+      'onCpCurrent','onCpNew','onCpConfirm','submitChangePassword',
+      'goMembers','loadMembers','openInvite','closeInvite','onInviteEmail','submitInvite',
+      'promoteMember','demoteMember','resetMemberPw','dismissNudge',
       'selectProvider','providerNext','onHost','testConn','setupBack','finishSetup','selectChatModel',
       'createSpace','newChat','onDraft','onKey','send','stopStream',
       'toggleConvMenu','closeConvMenu','onConvSearch',
@@ -783,18 +856,31 @@ class Component extends DCLogic {
     return { ok: res.ok, status: res.status, body };
   }
 
-  // ---------- bootstrap: /me → /settings ----------
+  // ---------- bootstrap: /me → forced change? → /settings ----------
   async bootstrap() {
     const me = await this.apiJson('/api/auth/me');
-    if (!me.ok) { this.setState({ ready:true, stage:'login' }); return; }
-    const email = me.body && me.body.user ? me.body.user.email : '';
+    if (!me.ok) {
+      // Not logged in. Ask whether this is a fresh workspace so the auth screen
+      // shows "create owner" (register) vs "sign in" — no user-facing toggle.
+      const bs = await this.apiJson('/api/auth/bootstrap-status');
+      const needsBootstrap = !!(bs.ok && bs.body && bs.body.needsBootstrap);
+      this.setState({ ready:true, stage:'login', needsBootstrap, authMode: needsBootstrap?'register':'login' });
+      return;
+    }
+    const user = (me.body && me.body.user) || {};
+    // A temp-password account must change it before reaching anything else (R10).
+    if (user.mustChangePassword) {
+      this.setState({ ready:true, stage:'changePassword', userEmail:user.email||'', userRole:user.workspaceRole||'member',
+        cpCurrent:'', cpNew:'', cpConfirm:'', cpError:'' });
+      return;
+    }
     const st = await this.apiJson('/api/settings');
     if (st.ok && st.body && st.body.isConfigured) {
-      this.setState({ ready:true, stage:'app', userEmail:email, settingsModel: st.body.chatModel || '' });
+      this.setState({ ready:true, stage:'app', userEmail:user.email||'', userRole:user.workspaceRole||'member', settingsModel: st.body.chatModel || '' });
       await this.loadSpaces();
     } else {
       const hostHint = (st.ok && st.body && st.body.ollamaUrl) ? st.body.ollamaUrl : this.state.ollamaHost;
-      this.setState({ ready:true, stage:'setup', setupStep:'provider', userEmail:email, ollamaHost: hostHint });
+      this.setState({ ready:true, stage:'setup', setupStep:'provider', userEmail:user.email||'', userRole:user.workspaceRole||'member', ollamaHost: hostHint });
     }
   }
 
@@ -802,12 +888,12 @@ class Component extends DCLogic {
   onEmail(e){ this.setState({ email:e.target.value, authError:'' }); }
   onPassword(e){ this.setState({ password:e.target.value, authError:'' }); }
   onAuthKey(e){ if (e.key==='Enter') { e.preventDefault(); this.submitAuth(); } }
-  toggleAuthMode(){ this.setState({ authMode: this.state.authMode==='login'?'register':'login', authError:'' }); }
   async submitAuth() {
     if (this.state.authBusy) return;
     const email=(this.state.email||'').trim(), password=this.state.password||'';
     if (!email || !password) { this.setState({ authError:'Enter an email and password.' }); return; }
-    const path = this.state.authMode==='register' ? '/api/auth/register' : '/api/auth/login';
+    // Register is only reachable while the workspace needs its owner (bootstrap).
+    const path = (this.state.authMode==='register' && this.state.needsBootstrap) ? '/api/auth/register' : '/api/auth/login';
     this.setState({ authBusy:true, authError:'' });
     const r = await this.apiJson(path, { method:'POST', body: JSON.stringify({ email, password }) });
     this.setState({ authBusy:false });
@@ -820,7 +906,7 @@ class Component extends DCLogic {
     if (r.status===429) msg = 'Too many attempts — wait a minute and try again.';
     else if (r.status===401) msg = 'Incorrect email or password.';
     else if (r.status===409) msg = 'That email is already registered — sign in instead.';
-    else if (r.status===403) msg = 'Registration is disabled. Ask the workspace owner for an account.';
+    else if (r.status===403) msg = 'Sign-up is closed. Ask a workspace admin to create your account.';
     else if (r.status===400) msg = 'Enter a valid email and a non-empty password.';
     else if (r.body && r.body.error) msg = String(r.body.error);
     this.setState({ authError: msg });
@@ -830,6 +916,75 @@ class Component extends DCLogic {
     if (this._es) { try { this._abort && this._abort.abort(); } catch(e){} }
     this.setState({ stage:'login', authMode:'login', email:'', password:'', authError:'',
       spaces:[], spaceId:null, messages:[], railSources:[], connectorsBySpace:{}, documentsBySpace:{}, convsBySpace:{}, activeConvBySpace:{} });
+    await this.bootstrap();
+  }
+
+  // ---------- forced first-login password change (R10) ----------
+  onCpCurrent(e){ this.setState({ cpCurrent:e.target.value, cpError:'' }); }
+  onCpNew(e){ this.setState({ cpNew:e.target.value, cpError:'' }); }
+  onCpConfirm(e){ this.setState({ cpConfirm:e.target.value, cpError:'' }); }
+  async submitChangePassword() {
+    if (this.state.cpBusy) return;
+    const { cpCurrent, cpNew, cpConfirm } = this.state;
+    if (!cpCurrent || !cpNew) { this.setState({ cpError:'Enter your temporary password and a new one.' }); return; }
+    if (cpNew.length < 8) { this.setState({ cpError:'New password must be at least 8 characters.' }); return; }
+    if (cpNew !== cpConfirm) { this.setState({ cpError:'New passwords do not match.' }); return; }
+    this.setState({ cpBusy:true, cpError:'' });
+    const r = await this.apiJson('/api/auth/change-password', { method:'POST', body: JSON.stringify({ currentPassword: cpCurrent, newPassword: cpNew }) });
+    this.setState({ cpBusy:false });
+    if (r.ok) { this.setState({ cpCurrent:'', cpNew:'', cpConfirm:'' }); await this.bootstrap(); return; }
+    this.setState({ cpError: r.status===401 ? 'Temporary password is incorrect.' : 'Could not change the password.' });
+  }
+
+  // ---------- members & access (admin) ----------
+  async goMembers(){ this.setState({ view:'members' }); await this.loadMembers(); }
+  async loadMembers(){
+    this.setState({ membersBusy:true });
+    const [m, sp] = await Promise.all([ this.apiJson('/api/members'), this.apiJson('/api/spaces') ]);
+    this.setState({ membersBusy:false, members: (m.ok && Array.isArray(m.body)) ? m.body : [],
+      spaces: (sp.ok && Array.isArray(sp.body)) ? sp.body : this.state.spaces });
+  }
+  // Cycle a member's per-space role on click: none → viewer → editor → none.
+  async cycleCell(userId, spaceId, current){
+    const next = current==='' ? 'viewer' : current==='viewer' ? 'editor' : '';
+    if (next==='') {
+      const r = await this.api('/api/members/'+userId+'/roles/'+spaceId, { method:'DELETE' });
+      if (!r.ok) { this.flash('Could not revoke access.'); return; }
+    } else {
+      const r = await this.apiJson('/api/members/'+userId+'/roles', { method:'POST', body: JSON.stringify({ spaceId, role: next }) });
+      if (!r.ok) { this.flash('Could not update the role.'); return; }
+    }
+    await this.loadMembers();
+  }
+  async promoteMember(userId){
+    const r = await this.api('/api/members/'+userId+'/promote', { method:'POST' });
+    if (!r.ok) { this.flash(r.status===403 ? 'Only the owner can promote admins.' : 'Could not promote.'); return; }
+    this.flash('Promoted to admin'); await this.loadMembers();
+  }
+  async demoteMember(userId){
+    const r = await this.api('/api/members/'+userId+'/demote', { method:'POST' });
+    if (!r.ok) { this.flash(r.status===409 ? 'Cannot remove the last admin.' : (r.status===403 ? 'That admin cannot be demoted.' : 'Could not demote.')); return; }
+    this.flash('Demoted to member'); await this.loadMembers();
+  }
+  async resetMemberPw(userId){
+    const r = await this.apiJson('/api/members/'+userId+'/reset-password', { method:'POST' });
+    if (!r.ok) { this.flash('Could not reset the password.'); return; }
+    this.setState({ inviteResult: { email: (this.state.members.find(m=>m.id===userId)||{}).email || '', tempPassword: r.body.tempPassword, reset:true }, inviteOpen:true });
+  }
+  dismissNudge(){ this.setState({ nudgeDismissed:true }); }
+  openInvite(){ this.setState({ inviteOpen:true, inviteEmail:'', inviteResult:null, inviteBusy:false }); }
+  closeInvite(){ if (this.state.inviteBusy) return; this.setState({ inviteOpen:false }); }
+  onInviteEmail(e){ this.setState({ inviteEmail:e.target.value }); }
+  async submitInvite(){
+    if (this.state.inviteBusy) return;
+    const email = (this.state.inviteEmail||'').trim();
+    if (!email) return;
+    this.setState({ inviteBusy:true });
+    const r = await this.apiJson('/api/members', { method:'POST', body: JSON.stringify({ email }) });
+    this.setState({ inviteBusy:false });
+    if (!r.ok) { this.flash(r.status===409 ? 'That email already has an account.' : 'Could not create the account.'); return; }
+    this.setState({ inviteResult: { email, tempPassword: r.body.tempPassword, reset:false } });
+    await this.loadMembers();
   }
 
   // ---------- setup wizard ----------
@@ -1527,20 +1682,57 @@ class Component extends DCLogic {
     const showNoConnectors = msgs.length===0 && !s.loading && !s.streaming && hasActiveSpace && !hasConnectors;
     const lastTV = (s.lastTiming && !s.streaming) ? this.timingView(s.lastTiming) : null;
 
+    // --- members & access view model (admin only) ---
+    const canManageMembers = s.userRole==='owner' || s.userRole==='admin';
+    const isOwner = s.userRole==='owner';
+    const GRADS = ['linear-gradient(135deg,#fb7185,#f59e0b)','linear-gradient(135deg,#60a5fa,#a78bfa)','linear-gradient(135deg,#2dd4bf,#60a5fa)','linear-gradient(135deg,#f59e0b,#ef4444)'];
+    const wsBadgeStyle = (ws)=>{
+      const c = ws==='owner' ? '#a78bfa' : ws==='admin' ? '#60a5fa' : '#768493';
+      return 'display:inline-block;font-size:10px;font-family:\'Geist Mono\',monospace;color:'+c+';border:1px solid '+c+'44;background:'+c+'1a;border-radius:999px;padding:2px 9px;text-transform:uppercase;';
+    };
+    const cellStyle = (role)=>{
+      const on = role==='editor' ? '#2dd4bf' : role==='viewer' ? '#768493' : '';
+      const base = 'display:inline-block;min-width:62px;font-size:11px;font-family:\'Geist Mono\',monospace;border-radius:999px;padding:3px 0;cursor:pointer;text-transform:uppercase;';
+      if (!on) return base+'color:#4d5b6b;border:1px dashed #2a3a4c;';
+      return base+'color:'+on+';border:1px solid '+on+'44;background:'+on+'1a;';
+    };
+    const matrixSpaces = s.spaces.map(sp => ({ id:sp.id, name:sp.name, color:'#e0454a' }));
+    const matrixRows = s.members.map((mem, i) => {
+      const ws = mem.workspaceRole || 'member';
+      const isWsAdmin = ws==='owner' || ws==='admin';
+      const bySpace = {}; (mem.memberships||[]).forEach(m=>{ bySpace[m.spaceId]=m.role; });
+      const cells = s.spaces.map(sp => {
+        if (isWsAdmin) return { label:'all', style:'display:inline-block;min-width:62px;font-size:11px;font-family:\'Geist Mono\',monospace;color:#4d5b6b;', click:()=>{} };
+        const role = bySpace[sp.id] || '';
+        return { label: role || '—', style: cellStyle(role), click: ()=>this.cycleCell(mem.id, sp.id, role) };
+      });
+      return {
+        id:mem.id, email:mem.email, name:(mem.email||'').split('@')[0], initials:(mem.email||'?').slice(0,2).toUpperCase(),
+        grad: GRADS[i % GRADS.length], wsLabel: ws, wsStyle: wsBadgeStyle(ws),
+        canPromote: isOwner && ws==='member', canDemote: isOwner && ws==='admin',
+        promote: ()=>this.promoteMember(mem.id), demote: ()=>this.demoteMember(mem.id), reset: ()=>this.resetMemberPw(mem.id),
+        pending: !!mem.mustChangePassword,
+      };
+    });
+    const adminCount = s.members.filter(m=>m.workspaceRole==='owner'||m.workspaceRole==='admin').length;
+
     return {
       // gate: render nothing meaningful until bootstrap resolves
       isAuth: s.stage!=='app', isApp: s.stage==='app',
-      isLogin: s.stage==='login', isSetup: s.stage==='setup',
-      // auth screen
-      authTitle: s.authMode==='register' ? 'Create your account' : 'Sign in',
-      authSubtitle: s.authMode==='register' ? 'The first account becomes the workspace owner.' : 'Welcome back. Pick up where your spaces left off.',
-      authBtnLabel: s.authBusy ? 'Working…' : (s.authMode==='register' ? 'Create account' : 'Sign in'),
+      isLogin: s.stage==='login', isSetup: s.stage==='setup', isChangePw: s.stage==='changePassword',
+      // auth screen. Register mode is reached only at bootstrap (first owner).
+      authTitle: s.authMode==='register' ? 'Create root/admin user' : 'Sign in',
+      authSubtitle: s.authMode==='register' ? 'This first account becomes the workspace owner — it holds admin rights and provisions everyone else.' : 'Welcome back. Pick up where your spaces left off.',
+      authBtnLabel: s.authBusy ? 'Working…' : (s.authMode==='register' ? 'Create owner account' : 'Sign in'),
       authBtnStyle: 'width:100%; margin-top:20px; background:#e0454a; color:#fff; border:0; border-radius:9px; padding:12px; font:600 13.5px \'Geist\'; cursor:'+(s.authBusy?'default':'pointer')+';'+(s.authBusy?'opacity:0.75;':''),
-      authSwitchPrefix: s.authMode==='register' ? 'Already have an account?' : 'First time here?',
-      authSwitchAction: s.authMode==='register' ? 'Sign in' : 'Create the first account',
-      toggleAuthMode: this.toggleAuthMode,
       email: s.email, password: s.password, onEmail:this.onEmail, onPassword:this.onPassword, onAuthKey:this.onAuthKey,
       submitAuth: this.submitAuth, authError: s.authError,
+      // forced first-login password change
+      cpCurrent: s.cpCurrent, cpNew: s.cpNew, cpConfirm: s.cpConfirm, cpError: s.cpError,
+      onCpCurrent:this.onCpCurrent, onCpNew:this.onCpNew, onCpConfirm:this.onCpConfirm,
+      submitChangePassword:this.submitChangePassword,
+      cpBtnLabel: s.cpBusy ? 'Updating…' : 'Set new password',
+      cpBtnStyle: 'width:100%; margin-top:20px; background:#e0454a; color:#fff; border:0; border-radius:9px; padding:12px; font:600 13.5px \'Geist\'; cursor:'+(s.cpBusy?'default':'pointer')+';'+(s.cpBusy?'opacity:0.75;':''),
       // setup
       setupProviderStep: s.setupStep==='provider', setupConnectStep: s.setupStep==='connect',
       setupStepNum: s.setupStep==='provider'?1:2,
@@ -1555,12 +1747,29 @@ class Component extends DCLogic {
       userEmail: s.userEmail, userInitials: (s.userEmail||'?').slice(0,2).toUpperCase(),
       createSpace: this.createSpace, logout: this.logout, newChat: this.newChat,
       // nav
-      goChat: this.goChat, goSources: this.goSources, goAgents: ()=>{}, goMembers: ()=>{},
+      goChat: this.goChat, goSources: this.goSources, goAgents: ()=>{}, goMembers: this.goMembers,
       navChat: { style:this.navStyle(s.view==='chat'), icon: s.view==='chat'?'#e0454a':'#768493' },
       navSources: { style:this.navStyle(s.view==='sources'), icon: s.view==='sources'?'#e0454a':'#768493' },
       navAgents: { style:this.navStyle(false), icon:'#768493' },
-      navMembers: { style:this.navStyle(false), icon:'#768493' },
-      isChat: s.view==='chat', isSources: s.view==='sources', isAgents:false, isMembers:false,
+      navMembers: { style:this.navStyle(s.view==='members'), icon: s.view==='members'?'#e0454a':'#768493' },
+      isChat: s.view==='chat', isSources: s.view==='sources', isAgents:false, isMembers: s.view==='members',
+      // members & access (admin only)
+      canManageMembers, isOwner, membersBusy: s.membersBusy,
+      matrixSpaces, matrixRows, hasMatrixSpaces: matrixSpaces.length>0,
+      roleLabel: s.userRole, workspaceRoleLabel: 'workspace '+(s.userRole||'member'),
+      userFooterStyle: (canManageMembers ? '' : 'margin-top:auto;') + 'padding:12px; border-top:1px solid #1f2c3b; display:flex; align-items:center; gap:10px;',
+      secondAdminNudge: canManageMembers && adminCount<=1 && s.members.length>0 && !s.nudgeDismissed,
+      dismissNudge: this.dismissNudge, openInvite: this.openInvite,
+      // invite / temp-password dialog
+      inviteOpen: s.inviteOpen, inviteEmail: s.inviteEmail, onInviteEmail: this.onInviteEmail,
+      submitInvite: this.submitInvite, closeInvite: this.closeInvite,
+      inviteBusy: s.inviteBusy, inviteResult: s.inviteResult,
+      inviteBtnLabel: s.inviteBusy ? 'Creating…' : 'Create account',
+      inviteHasResult: !!s.inviteResult, inviteFormOpen: s.inviteOpen && !s.inviteResult,
+      inviteBtnStyle: 'font-size:13px; color:#fff; background:'+((s.inviteEmail||'').trim()?'#e0454a':'#7a2c2f')+'; border:0; border-radius:7px; padding:9px 16px; cursor:'+(s.inviteBusy?'wait':((s.inviteEmail||'').trim()?'pointer':'not-allowed'))+';',
+      inviteResultEmail: s.inviteResult ? s.inviteResult.email : '',
+      inviteResultPw: s.inviteResult ? s.inviteResult.tempPassword : '',
+      inviteResultTitle: s.inviteResult && s.inviteResult.reset ? 'Password reset' : 'Account created',
       // conversation menu
       convMenuOpen: !!s.convMenuOpen, toggleConvMenu:this.toggleConvMenu, closeConvMenu:this.closeConvMenu,
       showConvSearch: convs.length>MENU_CAP, convSearch:s.convSearch||'', onConvSearch:this.onConvSearch,

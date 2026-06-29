@@ -8,9 +8,22 @@ import { prisma } from "../db/client.js";
 import type { AuthUser } from "./types.js";
 import { SESSION_TTL_MS } from "./types.js";
 
-// Project the public-safe view of a user (never the password hash).
-function toAuthUser(u: { id: string; email: string; createdAt: Date }): AuthUser {
-  return { id: u.id, email: u.email, createdAt: u.createdAt };
+// Project the public-safe view of a user (never the password hash or temp-pw
+// expiry). Accepts the full Prisma User and picks only the exposable fields.
+function toAuthUser(u: {
+  id: string;
+  email: string;
+  createdAt: Date;
+  workspaceRole: string;
+  mustChangePassword: boolean;
+}): AuthUser {
+  return {
+    id: u.id,
+    email: u.email,
+    createdAt: u.createdAt,
+    workspaceRole: u.workspaceRole,
+    mustChangePassword: u.mustChangePassword,
+  };
 }
 
 // Normalize emails so "A@b.com" and "a@b.com " are the same account.
@@ -32,10 +45,10 @@ export async function isFirstAccount(): Promise<boolean> {
 }
 
 /**
- * Register a new account. Hashes the password with argon2 and persists the user.
- * Throws {@link DuplicateEmailError} if the (normalized) email is taken. The
- * registration *policy* (bootstrap-then-gated) lives in the route layer; this
- * function just creates the user.
+ * Register the bootstrap account. Hashes the password with argon2 and persists
+ * the user as the workspace `owner` (the first and only account this path
+ * creates — the route is bootstrap-only; later accounts come from the admin
+ * Members flow). Throws {@link DuplicateEmailError} if the email is taken.
  */
 export async function register(email: string, password: string): Promise<AuthUser> {
   const normalized = normalizeEmail(email);
@@ -43,9 +56,12 @@ export async function register(email: string, password: string): Promise<AuthUse
   if (existing) {
     throw new DuplicateEmailError();
   }
+  // The first account ever created is the workspace owner (R1). Defensive
+  // fallback to "member" should this ever be reached with users present.
+  const workspaceRole = (await prisma.user.count()) === 0 ? "owner" : "member";
   const passwordHash = await argon2.hash(password);
   const user = await prisma.user.create({
-    data: { email: normalized, passwordHash },
+    data: { email: normalized, passwordHash, workspaceRole },
   });
   return toAuthUser(user);
 }
@@ -68,7 +84,54 @@ export async function verifyLogin(email: string, password: string): Promise<Auth
     // A malformed/legacy hash should read as "wrong password", not a 500.
     ok = false;
   }
-  return ok ? toAuthUser(user) : null;
+  if (!ok) {
+    return null;
+  }
+  // An expired temporary password is dead: the account needs an admin reset.
+  // Surface it as a generic failure (no enumeration of "expired vs wrong").
+  if (user.tempPasswordExpiresAt && user.tempPasswordExpiresAt.getTime() <= Date.now()) {
+    return null;
+  }
+  return toAuthUser(user);
+}
+
+export class PasswordChangeError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "PasswordChangeError";
+  }
+}
+
+/**
+ * Change a user's password (used for the forced first-login change and ordinary
+ * changes). Verifies the current password, then sets the new hash and clears the
+ * temp-password flags in one update. Returns the refreshed public user, or
+ * `null` if the current password does not verify.
+ */
+export async function changePassword(
+  userId: string,
+  currentPassword: string,
+  newPassword: string,
+): Promise<AuthUser | null> {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) {
+    return null;
+  }
+  let ok = false;
+  try {
+    ok = await argon2.verify(user.passwordHash, currentPassword);
+  } catch {
+    ok = false;
+  }
+  if (!ok) {
+    return null;
+  }
+  const passwordHash = await argon2.hash(newPassword);
+  const updated = await prisma.user.update({
+    where: { id: userId },
+    data: { passwordHash, mustChangePassword: false, tempPasswordExpiresAt: null },
+  });
+  return toAuthUser(updated);
 }
 
 /**
@@ -127,4 +190,15 @@ export async function destroySession(sessionId: string | undefined | null): Prom
     return;
   }
   await prisma.session.deleteMany({ where: { id: sessionId } });
+}
+
+/**
+ * Drop every session for a user, forcing re-login on their next request. Used by
+ * the members flow when a role/password change should take effect immediately
+ * (the app-layer stand-in for the crypto branch's keyring eviction). Access
+ * changes are already effective on the next request — guards re-read the DB — but
+ * this also evicts the live session for a stronger boundary.
+ */
+export async function dropSessionsForUser(userId: string): Promise<void> {
+  await prisma.session.deleteMany({ where: { userId } });
 }

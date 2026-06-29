@@ -14,11 +14,57 @@ datasource db {
 }
 
 model User {
-  id           String    @id @default(cuid())
-  email        String    @unique
-  passwordHash String
-  createdAt    DateTime  @default(now())
-  sessions     Session[]
+  id                    String       @id @default(cuid())
+  email                 String       @unique
+  passwordHash          String
+  // Workspace-level role (RBAC). "owner" is the bootstrap account; "admin"
+  // holds management rights; "member" is a plain user. Per-space access is
+  // separate (see Membership). Validated at the app layer (SQLite has no enums).
+  workspaceRole         String       @default("member") // owner | admin | member
+  // Set when an admin provisions/resets the account with a temp password; the
+  // user is forced to change it on first login (R10, R11).
+  mustChangePassword    Boolean      @default(false)
+  tempPasswordExpiresAt DateTime?
+  createdAt             DateTime     @default(now())
+  sessions              Session[]
+  memberships           Membership[]
+}
+
+// Per-space role grant (R2). Editors ingest/manage; viewers chat/read.
+// cyborgUserId / wrapped tokens are deliberately absent — that is the crypto
+// branch's concern, not this app-layer design.
+model Membership {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  spaceId   String
+  space     Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  role      String // editor | viewer
+  createdAt DateTime @default(now())
+
+  @@unique([userId, spaceId])
+  @@index([userId])
+  @@index([spaceId])
+}
+
+// Append-only accountability log for membership/account changes (R14).
+// actorUserId/targetUserId/spaceId are plain columns, NOT relations: the log
+// must outlive the rows it references (a deleted user's grants still audited).
+// Never stores secret material.
+model AuditLog {
+  id           String   @id @default(cuid())
+  actorUserId  String
+  action       String // account.create | role.grant | role.change | role.revoke | admin.promote | admin.demote | password.reset
+  targetUserId String?
+  spaceId      String?
+  role         String?
+  outcome      String // ok | rejected
+  detail       String   @default("") // optional human note, no secrets
+  createdAt    DateTime @default(now())
+
+  @@index([actorUserId])
+  @@index([targetUserId])
+  @@index([createdAt])
 }
 
 model Session {
@@ -44,6 +90,7 @@ model Space {
   connectors          Connector[]
   documents           Document[]
   conversations       Conversation[]
+  memberships         Membership[]
 }
 
 model Connector {

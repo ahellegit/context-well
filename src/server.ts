@@ -14,6 +14,7 @@ import connectorsRoutes from "./connectors/routes.js";
 import "./connectors/bootstrap.js"; // populates the connector registry (github, slack)
 import chatRoutes from "./chat/routes.js";
 import uploadsRoutes from "./uploads/routes.js";
+import membersRoutes from "./members/routes.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // public/ holds the rewired prototype frontend; in dist builds it sits two levels up.
@@ -47,6 +48,7 @@ export async function buildServer() {
     await protectedScope.register(connectorsRoutes); // U7
     await protectedScope.register(uploadsRoutes); // file uploads
     await protectedScope.register(chatRoutes); // U10
+    await protectedScope.register(membersRoutes); // RBAC members management (U4)
   });
 
   // Serve the static frontend last so /api/* takes precedence.
