@@ -649,23 +649,42 @@
       </div>
       <div style="flex:1; overflow-y:auto; min-height:0; padding:20px 0;">
         <div style="max-width:760px; margin:0 auto; padding:0 26px;">
-          <p style="color:#768493; font-size:12.5px; line-height:1.6; margin:0 0 16px;">Pick who can reach this space. <b style="color:#aebac8;">Viewer</b> = chat &amp; read; <b style="color:#aebac8;">Editor</b> = also ingest &amp; manage sources. Owners and admins always have full access.</p>
-          <sc-for list="{{ accessRows }}" as="a" hint-placeholder-count="4">
+          <p style="color:#768493; font-size:12.5px; line-height:1.6; margin:0 0 18px;"><b style="color:#aebac8;">Chat only</b> = chat &amp; read this space. <b style="color:#aebac8;">Source management</b> = also ingest &amp; manage its sources. Owners and admins always have full access.</p>
+
+          <!-- people with access -->
+          <div style="font-size:10px; letter-spacing:0.1em; color:#768493; text-transform:uppercase; font-family:'Geist Mono',monospace; margin:0 0 10px;">With access</div>
+          <sc-for list="{{ accessAdminRows }}" as="a">
             <div style="display:flex; align-items:center; gap:12px; padding:11px 14px; border:1px solid #1f2c3b; border-radius:10px; margin-bottom:8px; background:#0a1118;">
-              <span style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#60a5fa,#a78bfa);display:grid;place-items:center;font-size:10px;font-weight:600;color:rgba(0,0,0,0.78);flex:0 0 auto;">{{ a.initials }}</span>
+              <span style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#fb7185,#f59e0b);display:grid;place-items:center;font-size:10px;font-weight:600;color:rgba(0,0,0,0.78);flex:0 0 auto;">{{ a.initials }}</span>
               <span style="flex:1; min-width:0; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ a.email }}<span style="color:#768493;">{{ a.nameSuffix }}</span></span>
-              <sc-if value="{{ a.isWsAdmin }}">
-                <span style="{{ a.wsBadgeStyle }}">{{ a.wsBadge }}</span>
-              </sc-if>
-              <sc-if value="{{ a.isMember }}">
-                <span style="display:inline-flex;">
-                  <span onClick="{{ a.setNone }}" style="{{ a.noneStyle }}">None</span>
-                  <span onClick="{{ a.setViewer }}" style="{{ a.viewerStyle }}">Viewer</span>
-                  <span onClick="{{ a.setEditor }}" style="{{ a.editorStyle }}">Editor</span>
-                </span>
-              </sc-if>
+              <span style="{{ a.wsBadgeStyle }}">{{ a.wsBadge }}</span>
             </div>
           </sc-for>
+          <sc-for list="{{ accessGrantedRows }}" as="a" hint-placeholder-count="2">
+            <div style="display:flex; align-items:center; gap:12px; padding:11px 14px; border:1px solid #1f2c3b; border-radius:10px; margin-bottom:8px; background:#0a1118;">
+              <span style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#60a5fa,#a78bfa);display:grid;place-items:center;font-size:10px;font-weight:600;color:rgba(0,0,0,0.78);flex:0 0 auto;">{{ a.initials }}</span>
+              <span style="flex:1; min-width:0; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ a.email }}</span>
+              <span style="display:inline-flex;">
+                <span onClick="{{ a.setChat }}" style="{{ a.chatStyle }}">Chat only</span>
+                <span onClick="{{ a.setSource }}" style="{{ a.sourceStyle }}">Source management</span>
+              </span>
+              <span onClick="{{ a.remove }}" title="Remove access" style="margin-left:4px; width:26px;height:26px;border-radius:6px;display:grid;place-items:center;color:#768493;cursor:pointer;flex:0 0 auto;border:1px solid #2a3a4c;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></span>
+            </div>
+          </sc-for>
+
+          <!-- add a previously-invited user -->
+          <div style="font-size:10px; letter-spacing:0.1em; color:#768493; text-transform:uppercase; font-family:'Geist Mono',monospace; margin:20px 0 10px;">Add a member</div>
+          <sc-for list="{{ accessCandidates }}" as="a" hint-placeholder-count="2">
+            <div style="display:flex; align-items:center; gap:12px; padding:10px 14px; border:1px dashed #243140; border-radius:10px; margin-bottom:8px;">
+              <span style="width:26px;height:26px;border-radius:50%;background:#16202c;display:grid;place-items:center;font-size:9.5px;font-weight:600;color:#aebac8;flex:0 0 auto;">{{ a.initials }}</span>
+              <span style="flex:1; min-width:0; font-size:13px; color:#aebac8; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ a.email }}</span>
+              <span onClick="{{ a.addChat }}" style="{{ a.addChatStyle }}">+ Chat only</span>
+              <span onClick="{{ a.addSource }}" style="{{ a.addSourceStyle }}">+ Source management</span>
+            </div>
+          </sc-for>
+          <sc-if value="{{ noCandidates }}">
+            <div style="padding:18px; text-align:center; color:#4d5b6b; font-size:12.5px; line-height:1.6; border:1px dashed #1f2c3b; border-radius:10px;">No other accounts to add. Invite people in <b style="color:#768493;">Members &amp; access</b>, then add them here.</div>
+          </sc-if>
         </div>
       </div>
     </sc-if>
@@ -1074,7 +1093,8 @@ class Component extends DCLogic {
     if (!r.ok) { this.flash('Could not update access for '+who+'.'); return; }
     await this.loadAccess();
     await this.loadMembers();
-    this.flash(role==='' ? (who+' · access removed') : (who+' · now '+role));
+    const label = role==='editor' ? 'source management' : 'chat only';
+    this.flash(role==='' ? (who+' · access removed') : (who+' · '+label));
   }
 
   // ---------- setup wizard ----------
@@ -1809,26 +1829,35 @@ class Component extends DCLogic {
     const adminCount = s.members.filter(m=>m.workspaceRole==='owner'||m.workspaceRole==='admin').length;
 
     // Per-space access modal rows: each member user with a None/Viewer/Editor pill.
-    // Segmented control: 3 joined cells (None | Viewer | Editor); active is filled.
+    // Segmented control: two joined cells (Chat only | Source management).
     const seg = (active, color, pos) => {
-      const radius = pos==='l' ? 'border-radius:7px 0 0 7px;' : (pos==='r' ? 'border-radius:0 7px 7px 0;' : '');
+      const radius = pos==='l' ? 'border-radius:7px 0 0 7px;' : 'border-radius:0 7px 7px 0;';
       const overlap = pos==='l' ? '' : 'margin-left:-1px;';
       return 'display:inline-block;font-size:11.5px;font-family:\'Geist Mono\',monospace;padding:5px 13px;cursor:pointer;border:1px solid '+(active?color:'#2a3a4c')+';'+radius+overlap+(active?('color:#06121a;background:'+color+';font-weight:600;position:relative;z-index:1;'):'color:#768493;background:#0a1118;');
     };
-    const accessRows = s.accessUsers.map(u => {
-      const role = s.accessRoles[u.id] || '';
+    const wsBadgeStyleAccess = 'font-size:10.5px;font-family:\'Geist Mono\',monospace;color:#a78bfa;border:1px solid rgba(167,139,250,0.35);background:rgba(167,139,250,0.12);border-radius:999px;padding:3px 11px;';
+    const addBtn = (color)=>'font-size:11.5px;font-family:\'Geist Mono\',monospace;color:'+color+';border:1px solid '+color+'55;background:'+color+'14;border-radius:7px;padding:5px 11px;cursor:pointer;margin-left:6px;';
+    // Three groups: full-access admins/owner (incl. you), members already granted,
+    // and previously-invited members not yet added (candidates to add).
+    const accessAdminRows = [], accessGrantedRows = [], accessCandidates = [];
+    s.accessUsers.forEach(u => {
+      const initials = (u.email||'?').slice(0,2).toUpperCase();
       const ws = u.workspaceRole || 'member';
-      const isWsAdmin = ws==='owner' || ws==='admin';
-      const isSelf = u.email === s.userEmail;
-      return {
-        userId:u.id, email:u.email, initials:(u.email||'?').slice(0,2).toUpperCase(),
-        isWsAdmin, isMember: !isWsAdmin, isSelf,
-        nameSuffix: isSelf ? ' (you)' : '',
-        wsBadge: ws==='owner' ? 'Owner · full access' : 'Admin · full access',
-        wsBadgeStyle: 'font-size:10.5px;font-family:\'Geist Mono\',monospace;color:#a78bfa;border:1px solid rgba(167,139,250,0.35);background:rgba(167,139,250,0.12);border-radius:999px;padding:3px 11px;',
-        noneStyle: seg(role==='', '#768493', 'l'), viewerStyle: seg(role==='viewer', '#60a5fa', 'm'), editorStyle: seg(role==='editor', '#2dd4bf', 'r'),
-        setNone: ()=>this.setAccess(u.id, ''), setViewer: ()=>this.setAccess(u.id, 'viewer'), setEditor: ()=>this.setAccess(u.id, 'editor'),
-      };
+      if (ws==='owner' || ws==='admin') {
+        accessAdminRows.push({ email:u.email, initials, nameSuffix: u.email===s.userEmail?' (you)':'',
+          wsBadge: ws==='owner' ? 'Owner · full access' : 'Admin · full access', wsBadgeStyle: wsBadgeStyleAccess });
+        return;
+      }
+      const role = s.accessRoles[u.id] || '';
+      if (role) {
+        accessGrantedRows.push({ userId:u.id, email:u.email, initials,
+          chatStyle: seg(role==='viewer', '#60a5fa', 'l'), sourceStyle: seg(role==='editor', '#2dd4bf', 'r'),
+          setChat: ()=>this.setAccess(u.id, 'viewer'), setSource: ()=>this.setAccess(u.id, 'editor'), remove: ()=>this.setAccess(u.id, '') });
+      } else {
+        accessCandidates.push({ userId:u.id, email:u.email, initials,
+          addChatStyle: addBtn('#60a5fa'), addSourceStyle: addBtn('#2dd4bf'),
+          addChat: ()=>this.setAccess(u.id, 'viewer'), addSource: ()=>this.setAccess(u.id, 'editor') });
+      }
     });
 
     return {
@@ -1877,7 +1906,9 @@ class Component extends DCLogic {
       dismissNudge: this.dismissNudge, openInvite: this.openInvite,
       // per-space access tab
       accessSpaceName: s.accessSpaceName, accessBusy: s.accessBusy,
-      accessRows, hasAccessUsers: accessRows.length>0, noAccessUsers: accessRows.length===0,
+      accessAdminRows, accessGrantedRows, accessCandidates,
+      hasGranted: accessGrantedRows.length>0, hasCandidates: accessCandidates.length>0,
+      noCandidates: accessCandidates.length===0,
       // invite / temp-password dialog
       inviteOpen: s.inviteOpen, inviteEmail: s.inviteEmail, onInviteEmail: this.onInviteEmail,
       submitInvite: this.submitInvite, closeInvite: this.closeInvite,
