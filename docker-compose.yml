@@ -25,8 +25,24 @@ services:
       cyborgdb-service:
         condition: service_healthy
 
+  # One-shot ownership fix: a named volume is created root-owned on first use,
+  # but cyborgdb-service runs as cyborguser (uid 1000) and must write the
+  # embedding model into the HF cache. Without this, createIndex fails with
+  # "permission denied (RBAC): ... PermissionError [Errno 13]". Overrides the
+  # image entrypoint (a bare `command` would be passed to cyborgdb-service).
+  cyborgdb-init:
+    image: cyborginc/cyborgdb-service:0.17.0
+    user: root
+    entrypoint: ["chown", "-R", "1000:1000", "/home/cyborguser/.cache"]
+    volumes:
+      - cyborgdb_hf_cache:/home/cyborguser/.cache/huggingface
+    restart: "no"
+
   cyborgdb-service:
     image: cyborginc/cyborgdb-service:0.17.0
+    depends_on:
+      cyborgdb-init:
+        condition: service_completed_successfully
     environment:
       # Standalone disk (RocksDB) backend — persisted in the volume below.
       CYBORGDB_DB_TYPE: disk
