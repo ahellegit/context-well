@@ -28,6 +28,7 @@ model User {
   createdAt             DateTime     @default(now())
   sessions              Session[]
   memberships           Membership[]
+  conversations         Conversation[]
 }
 
 // Per-space role grant (R2). Editors ingest/manage; viewers chat/read.
@@ -138,12 +139,18 @@ model Conversation {
   id        String    @id @default(cuid())
   spaceId   String
   space     Space     @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  // Owner of the thread. Conversations are PRIVATE: only their creator may list
+  // or open them — admins included. Nullable only so the additive migration can
+  // backfill existing rows; new conversations always set it.
+  userId    String?
+  user      User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
   title     String    @default("New chat")
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   messages  Message[]
 
   @@index([spaceId])
+  @@index([userId])
 }
 
 model Message {

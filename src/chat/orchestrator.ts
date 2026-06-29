@@ -100,6 +100,8 @@ export interface RunTurnInput {
   signal?: AbortSignal;
   // Test seam: override the user's display name for `{{user.name}}` (R20).
   userName?: string;
+  // Owner for a conversation created via the spaceId path (chat privacy).
+  userId?: string;
   topK?: number;
 }
 
@@ -131,7 +133,8 @@ async function resolveTarget(input: RunTurnInput): Promise<{
   if (input.spaceId) {
     const space = await prisma.space.findUnique({ where: { id: input.spaceId } });
     if (!space) throw new Error(`Space ${input.spaceId} not found.`);
-    const conversation = await createConversation(space.id);
+    if (!input.userId) throw new Error("runTurn with spaceId requires userId (conversation owner).");
+    const conversation = await createConversation(space.id, input.userId);
     return { conversationId: conversation.id, space, history: [] };
   }
 

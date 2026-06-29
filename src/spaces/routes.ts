@@ -13,6 +13,7 @@ import {
   spaceFromConversation,
   spaceFromParam,
 } from "../auth/space-guard.js";
+import { listSpaceMembers } from "../members/service.js";
 import {
   appendMessage,
   createConversation,
@@ -83,6 +84,16 @@ export default async function spacesRoutes(app: FastifyInstance): Promise<void> 
     return reply.code(200).send({ customPrompt: updated.customPrompt });
   });
 
+  // List a space's members + roles (per-space access management). Admin/owner only.
+  app.get("/api/spaces/:id/members", { preHandler: requireWorkspaceRole("admin") }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const space = await getSpace(id);
+    if (!space) {
+      return reply.code(404).send({ error: "Space not found." });
+    }
+    return listSpaceMembers(id);
+  });
+
   // List the documents currently indexed in a space (files in context). Viewer+.
   app.get("/api/spaces/:id/documents", { preHandler: requireSpaceRole("viewer", spaceFromParam) }, async (request, reply) => {
     const { id } = request.params as { id: string };
@@ -100,7 +111,8 @@ export default async function spacesRoutes(app: FastifyInstance): Promise<void> 
     if (!space) {
       return reply.code(404).send({ error: "Space not found." });
     }
-    return listConversations(id);
+    // Private: only the caller's own conversations in this space.
+    return listConversations(id, request.user!.id);
   });
 
   // Start a new conversation in a space (R19). Viewer+ (viewers may chat).
@@ -112,14 +124,16 @@ export default async function spacesRoutes(app: FastifyInstance): Promise<void> 
     }
     const body = (request.body ?? {}) as CreateConversationBody;
     const title = typeof body.title === "string" ? body.title : undefined;
-    const conversation = await createConversation(id, title);
+    // Owned by the creator — the only person who can later see it.
+    const conversation = await createConversation(id, request.user!.id, title);
     return reply.code(201).send(conversation);
   });
 
-  // Reopen a conversation with its messages (R19). Viewer+ on its space.
+  // Reopen a conversation with its messages (R19). Viewer+ on its space AND the
+  // caller must own it — conversations are private (a non-owner gets 404, no oracle).
   app.get("/api/conversations/:id", { preHandler: requireSpaceRole("viewer", spaceFromConversation) }, async (request, reply) => {
     const { id } = request.params as { id: string };
-    const conversation = await getConversation(id);
+    const conversation = await getConversation(id, request.user!.id);
     if (!conversation) {
       return reply.code(404).send({ error: "Conversation not found." });
     }

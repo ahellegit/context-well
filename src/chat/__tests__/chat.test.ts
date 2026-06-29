@@ -391,7 +391,9 @@ describe("runTurn — start from spaceId (R19)", () => {
     queryMock.mockResolvedValue([hit({ id: "h1" })]);
     streamChatMock.mockImplementation(streamOf(["hello [1]"]));
 
-    const events = await drain(runTurn({ spaceId, userText: "start" }));
+    // Conversations are owned now; the spaceId path requires a userId.
+    const starter = await prisma.user.create({ data: { email: "starter@t.co", passwordHash: "x" } });
+    const events = await drain(runTurn({ spaceId, userText: "start", userId: starter.id }));
     const done = events.find((e) => (e as { type: string }).type === "done") as
       | { conversationId: string }
       | undefined;
@@ -402,6 +404,7 @@ describe("runTurn — start from spaceId (R19)", () => {
       include: { messages: true },
     });
     expect(convo?.spaceId).toBe(spaceId);
+    expect(convo?.userId).toBe(starter.id);
     expect(convo?.messages).toHaveLength(2);
   });
 });

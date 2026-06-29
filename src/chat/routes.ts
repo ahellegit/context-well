@@ -22,6 +22,7 @@
 
 import type { FastifyInstance, FastifyReply } from "fastify";
 import { requireSpaceRole, spaceFromConversation } from "../auth/space-guard.js";
+import { conversationOwner } from "../spaces/service.js";
 import { runTurn, RetrievalError } from "./orchestrator.js";
 
 interface MessageBody {
@@ -51,6 +52,13 @@ export default async function chatRoutes(app: FastifyInstance): Promise<void> {
       return reply.code(400).send({ error: "A non-empty text is required." });
     }
 
+    // Conversations are private: only the owner may post to (or read) a thread,
+    // even within a shared space. The space-role guard above proved membership;
+    // this proves ownership. 404 (not 403) so it can't confirm a thread exists.
+    if ((await conversationOwner(id)) !== request.user!.id) {
+      return reply.code(404).send({ error: "Conversation not found." });
+    }
+
     // Open the SSE stream. Hijack the reply so Fastify does not also try to send
     // a body — we own reply.raw from here on.
     reply.hijack();
@@ -73,6 +81,7 @@ export default async function chatRoutes(app: FastifyInstance): Promise<void> {
         userText: body.text,
         signal: controller.signal,
         userName: request.user?.email,
+        userId: request.user?.id,
       })) {
         switch (event.type) {
           case "sources":

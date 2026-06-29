@@ -193,21 +193,25 @@ export async function listDocuments(spaceId: string): Promise<SpaceDocument[]> {
   }));
 }
 
-/** Conversations for a space, most-recently-updated first. */
-export function listConversations(spaceId: string): Promise<Conversation[]> {
+/**
+ * A user's own conversations in a space, most-recently-updated first.
+ * Conversations are private (R: per-user chat privacy): scoped to `userId`.
+ */
+export function listConversations(spaceId: string, userId: string): Promise<Conversation[]> {
   return prisma.conversation.findMany({
-    where: { spaceId },
+    where: { spaceId, userId },
     orderBy: { updatedAt: "desc" },
   });
 }
 
-/** Start a new conversation in a space. */
+/** Start a new conversation in a space, owned by `userId` (its only viewer). */
 export function createConversation(
   spaceId: string,
+  userId: string,
   title?: string,
 ): Promise<Conversation> {
   return prisma.conversation.create({
-    data: title ? { spaceId, title } : { spaceId },
+    data: { spaceId, userId, ...(title ? { title } : {}) },
   });
 }
 
@@ -235,16 +239,24 @@ export function setConversationTitle(
 }
 
 /**
- * A conversation with its messages in chronological order, or null if missing.
- * Used to reopen a thread from the list (R19).
+ * A user's own conversation with its messages in chronological order, or null
+ * if it doesn't exist OR isn't owned by `userId`. Conversations are private, so
+ * a non-owner (admins included) gets `null` — indistinguishable from "missing".
  */
 export function getConversation(
   id: string,
+  userId: string,
 ): Promise<(Conversation & { messages: Message[] }) | null> {
-  return prisma.conversation.findUnique({
-    where: { id },
+  return prisma.conversation.findFirst({
+    where: { id, userId },
     include: { messages: { orderBy: { createdAt: "asc" } } },
   });
+}
+
+/** The owning userId of a conversation (or null if missing). For ownership checks. */
+export async function conversationOwner(id: string): Promise<string | null> {
+  const c = await prisma.conversation.findUnique({ where: { id }, select: { userId: true } });
+  return c?.userId ?? null;
 }
 
 export interface AppendMessageInput {

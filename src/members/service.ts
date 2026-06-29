@@ -80,6 +80,18 @@ export async function listMembers(): Promise<MemberWithRoles[]> {
   return users.map((u) => ({ ...toPublicMember(u), memberships: u.memberships }));
 }
 
+/** Members of a single space with their email + role (per-space access UI). */
+export async function listSpaceMembers(
+  spaceId: string,
+): Promise<{ userId: string; email: string; role: string }[]> {
+  const ms = await prisma.membership.findMany({
+    where: { spaceId },
+    include: { user: { select: { email: true } } },
+    orderBy: { createdAt: "asc" },
+  });
+  return ms.map((m) => ({ userId: m.userId, email: m.user.email, role: m.role }));
+}
+
 /** Count of workspace admins + owner — the "root holders" for the invariant. */
 export function countWorkspaceAdmins(): Promise<number> {
   return prisma.user.count({ where: { workspaceRole: { in: ["owner", "admin"] } } });

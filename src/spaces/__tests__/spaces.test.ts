@@ -27,6 +27,7 @@ vi.mock("../../cyborg/index-service.js", () => ({
 const { prisma } = await import("../../db/client.js");
 const {
   appendMessage,
+  conversationOwner,
   createConversation,
   createSpace,
   deleteSpace,
@@ -43,6 +44,9 @@ const spacesRoutes = (await import("../routes.js")).default;
 beforeEach(async () => {
   // Cascades clear connectors/documents/conversations/messages with the space.
   await prisma.space.deleteMany();
+  // Conversations are now owned by a user; clear users too so per-test owners
+  // don't collide on the unique email.
+  await prisma.user.deleteMany();
 
   provisionIndexMock.mockReset();
   deleteIndexMock.mockReset();
@@ -118,7 +122,8 @@ describe("createSpace", () => {
 describe("deleteSpace", () => {
   it("deletes the index before removing the row and cascades children", async () => {
     const space = await createSpace({ name: "To Delete" });
-    const convo = await createConversation(space.id, "thread");
+    const u = await prisma.user.create({ data: { email: "del@t.co", passwordHash: "x" } });
+    const convo = await createConversation(space.id, u.id, "thread");
     await appendMessage(convo.id, { role: "user", text: "hi" });
 
     const order: string[] = [];
@@ -137,7 +142,7 @@ describe("deleteSpace", () => {
 
     // Row gone, and the cascade removed its conversation + messages.
     expect(await getSpace(space.id)).toBeNull();
-    expect(await getConversation(convo.id)).toBeNull();
+    expect(await getConversation(convo.id, u.id)).toBeNull();
   });
 });
 
@@ -206,18 +211,19 @@ describe("spacesRoutes — indexKey never crosses the API boundary (R29)", () =>
 describe("conversations & messages", () => {
   it("creates, lists, and appends with an updatedAt touch", async () => {
     const space = await createSpace({ name: "Chatty" });
+    const u = await prisma.user.create({ data: { email: "chatty@t.co", passwordHash: "x" } });
 
-    const first = await createConversation(space.id);
+    const first = await createConversation(space.id, u.id);
     expect(first.title).toBe("New chat");
-    const second = await createConversation(space.id, "Named thread");
+    const second = await createConversation(space.id, u.id, "Named thread");
     expect(second.title).toBe("Named thread");
 
-    let convos = await listConversations(space.id);
+    let convos = await listConversations(space.id, u.id);
     expect(convos).toHaveLength(2);
 
     // Append a message to the older conversation; updatedAt should bump it to
     // the top of the most-recently-updated-first list.
-    const before = (await getConversation(first.id))!.updatedAt.getTime();
+    const before = (await getConversation(first.id, u.id))!.updatedAt.getTime();
     // Ensure a measurable clock tick.
     await new Promise((r) => setTimeout(r, 5));
 
@@ -236,7 +242,7 @@ describe("conversations & messages", () => {
     // Sources snapshot persisted as JSON (R30).
     expect(JSON.parse(asstMsg.sources)).toEqual(sources);
 
-    const reopened = await getConversation(first.id);
+    const reopened = await getConversation(first.id, u.id);
     expect(reopened!.messages).toHaveLength(2);
     expect(reopened!.messages[0].text).toBe("What is RAG?");
     expect(reopened!.messages[1].text).toBe(
@@ -246,8 +252,34 @@ describe("conversations & messages", () => {
     expect(reopened!.updatedAt.getTime()).toBeGreaterThan(before);
 
     // first is now most-recently-updated, so it sorts ahead of second.
-    convos = await listConversations(space.id);
+    convos = await listConversations(space.id, u.id);
     expect(convos[0].id).toBe(first.id);
+  });
+});
+
+describe("conversation privacy — threads are per-user", () => {
+  it("a member only lists/opens their own conversations, never another's", async () => {
+    const space = await createSpace({ name: "Shared" });
+    const alice = await prisma.user.create({ data: { email: "alice@t.co", passwordHash: "x" } });
+    const bob = await prisma.user.create({ data: { email: "bob@t.co", passwordHash: "x" } });
+
+    const aConvo = await createConversation(space.id, alice.id, "alice thread");
+    const bConvo = await createConversation(space.id, bob.id, "bob thread");
+
+    // Each sees only their own in the shared space.
+    const aList = await listConversations(space.id, alice.id);
+    expect(aList.map((c) => c.id)).toEqual([aConvo.id]);
+    const bList = await listConversations(space.id, bob.id);
+    expect(bList.map((c) => c.id)).toEqual([bConvo.id]);
+
+    // Alice cannot open Bob's thread (null = indistinguishable from missing).
+    expect(await getConversation(bConvo.id, alice.id)).toBeNull();
+    // Her own opens fine.
+    expect((await getConversation(aConvo.id, alice.id))?.id).toBe(aConvo.id);
+
+    // Ownership lookup (used by the chat route to 404 a non-owner's POST).
+    expect(await conversationOwner(bConvo.id)).toBe(bob.id);
+    expect(await conversationOwner(aConvo.id)).toBe(alice.id);
   });
 });
 
