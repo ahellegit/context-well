@@ -29,7 +29,7 @@
   .kl-space-del:hover { background:rgba(224,69,74,0.16) !important; color:#e0454a !important; }
   .kl-subnav { overflow:hidden; max-height:0; opacity:0; transform:translateY(-2px); pointer-events:none;
     transition:max-height .26s cubic-bezier(.4,0,.2,1), opacity .18s ease, transform .26s cubic-bezier(.4,0,.2,1); }
-  .kl-subnav.open { max-height:120px; opacity:1; transform:translateY(0); pointer-events:auto; }
+  .kl-subnav.open { max-height:160px; opacity:1; transform:translateY(0); pointer-events:auto; }
   .kl-subnav button:hover { background:rgba(224,69,74,0.07); }
   @keyframes kl-fade-in { from { opacity:0; transform:translateY(3px); } to { opacity:1; transform:translateY(0); } }
   .kl-switch-fade { animation:kl-fade-in .24s cubic-bezier(.4,0,.2,1); }
@@ -201,6 +201,9 @@
             <div style="margin:2px 0 5px 13px; padding-left:10px; border-left:1px solid #22303f; display:flex; flex-direction:column; gap:1px;">
               <button onClick="{{ sp.goChat }}" style="{{ sp.chatStyle }}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="{{ sp.chatIcon }}" stroke-width="1.7"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Chats</button>
               <button onClick="{{ sp.goSources }}" style="{{ sp.sourcesStyle }}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="{{ sp.sourcesIcon }}" stroke-width="1.7"><path d="m12 2 10 6-10 6L2 8z"/><path d="m2 17 10 6 10-6M2 12l10 6 10-6"/></svg>Sources<span style="{{ sp.srcCountStyle }}">{{ sp.sourceCount }}</span></button>
+              <sc-if value="{{ sp.showAccess }}">
+                <button onClick="{{ sp.goAccess }}" style="{{ sp.accessStyle }}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="{{ sp.accessIcon }}" stroke-width="1.7"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>Access</button>
+              </sc-if>
             </div>
           </div>
         </div>
@@ -405,9 +408,6 @@
       <div style="height:54px; border-bottom:1px solid #1f2c3b; display:flex; align-items:center; gap:10px; padding:0 22px; flex:0 0 auto;">
         <span style="{{ headerDotStyle }}"></span><b style="font-size:14px;">{{ spaceName }}</b>
         <span style="font-size:11px; color:#768493; font-family:'Geist Mono',monospace;">· sources &amp; behavior</span>
-        <sc-if value="{{ showAccessBtn }}">
-          <span onClick="{{ openAccess }}" title="Manage who can access this space" style="margin-left:auto; display:inline-flex; align-items:center; gap:7px; font-size:12px; color:#aebac8; background:#0e1620; border:1px solid #2a3a4c; border-radius:7px; padding:6px 12px; cursor:pointer;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>Access</span>
-        </sc-if>
       </div>
       <div style="flex:1; overflow-y:auto; padding:24px 26px; min-height:0;">
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:24px; max-width:1100px;">
@@ -641,6 +641,31 @@
       </div>
     </sc-if>
 
+    <!-- ACCESS VIEW (per-space; admin/owner only) -->
+    <sc-if value="{{ isAccess }}">
+      <div style="height:54px; border-bottom:1px solid #1f2c3b; display:flex; align-items:center; gap:10px; padding:0 22px; flex:0 0 auto;">
+        <span style="{{ headerDotStyle }}"></span><b style="font-size:14px;">{{ accessSpaceName }}</b>
+        <span style="font-size:11px; color:#768493; font-family:'Geist Mono',monospace;">· who can access this space</span>
+      </div>
+      <div style="flex:1; overflow-y:auto; min-height:0; padding:20px 0;">
+        <div style="max-width:760px; margin:0 auto; padding:0 26px;">
+          <p style="color:#768493; font-size:12.5px; line-height:1.6; margin:0 0 16px;">Pick who can reach this space. <b style="color:#aebac8;">Viewer</b> = chat &amp; read; <b style="color:#aebac8;">Editor</b> = also ingest &amp; manage sources. Owners and admins always have access, so only member accounts are listed here.</p>
+          <sc-for list="{{ accessRows }}" as="a" hint-placeholder-count="4">
+            <div style="display:flex; align-items:center; gap:11px; padding:11px 14px; border:1px solid #1f2c3b; border-radius:10px; margin-bottom:8px; background:#0a1118;">
+              <span style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#60a5fa,#a78bfa);display:grid;place-items:center;font-size:10px;font-weight:600;color:rgba(0,0,0,0.78);flex:0 0 auto;">{{ a.initials }}</span>
+              <span style="flex:1; min-width:0; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ a.email }}</span>
+              <span onClick="{{ a.setNone }}" style="{{ a.noneStyle }}">none</span>
+              <span onClick="{{ a.setViewer }}" style="{{ a.viewerStyle }}">viewer</span>
+              <span onClick="{{ a.setEditor }}" style="{{ a.editorStyle }}">editor</span>
+            </div>
+          </sc-for>
+          <sc-if value="{{ noAccessUsers }}">
+            <div style="padding:28px; text-align:center; color:#4d5b6b; font-size:12.5px; line-height:1.6; border:1px dashed #1f2c3b; border-radius:10px;">No member accounts yet.<br>Create accounts in <b style="color:#768493;">Members &amp; access</b>, then grant them here.</div>
+          </sc-if>
+        </div>
+      </div>
+    </sc-if>
+
   </main>
 </div>
 </sc-if>
@@ -730,37 +755,6 @@
           <button onClick="{{ closeInvite }}" style="font-size:13px; color:#fff; background:#e0454a; border:0; border-radius:7px; padding:9px 16px; cursor:pointer;">Done</button>
         </div>
       </sc-if>
-    </div>
-  </div>
-</sc-if>
-
-<!-- ========= SPACE ACCESS (per-space members) ========= -->
-<sc-if value="{{ accessOpen }}">
-  <div onClick="{{ closeAccess }}" style="position:fixed; inset:0; background:rgba(2,6,11,0.65); backdrop-filter:blur(4px); display:grid; place-items:center; z-index:100; padding:20px;">
-    <div onClick="{{ stop }}" style="width:540px; max-width:100%; max-height:80vh; background:#0a1118; border:1px solid #2a3a4c; border-radius:16px; box-shadow:0 24px 64px rgba(0,0,0,0.6); overflow:hidden; display:flex; flex-direction:column;">
-      <div style="padding:20px 22px 14px; border-bottom:1px solid #1f2c3b; display:flex; align-items:flex-start; gap:12px;">
-        <span style="width:32px;height:32px;border-radius:8px;background:rgba(224,69,74,0.13);display:grid;place-items:center;flex:0 0 auto;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#e0454a" stroke-width="1.8"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
-        <div style="flex:1;"><h3 style="font-size:15px; font-weight:600; margin:0;">Access · {{ accessSpaceName }}</h3><p style="color:#768493; font-size:12px; margin:4px 0 0; line-height:1.5;">Choose who can reach this space. Viewer = chat &amp; read; Editor = also ingest &amp; manage sources. Owners and admins always have access.</p></div>
-        <button onClick="{{ closeAccess }}" style="width:30px;height:30px;border-radius:6px;background:transparent;border:0;color:#768493;cursor:pointer;display:grid;place-items:center;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
-      </div>
-      <div style="padding:8px 0; overflow-y:auto;">
-        <sc-for list="{{ accessRows }}" as="a" hint-placeholder-count="3">
-          <div style="display:flex; align-items:center; gap:11px; padding:9px 22px;">
-            <span style="width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,#60a5fa,#a78bfa);display:grid;place-items:center;font-size:9.5px;font-weight:600;color:rgba(0,0,0,0.78);flex:0 0 auto;">{{ a.initials }}</span>
-            <span style="flex:1; min-width:0; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ a.email }}</span>
-            <span onClick="{{ a.setNone }}" style="{{ a.noneStyle }}">none</span>
-            <span onClick="{{ a.setViewer }}" style="{{ a.viewerStyle }}">viewer</span>
-            <span onClick="{{ a.setEditor }}" style="{{ a.editorStyle }}">editor</span>
-          </div>
-        </sc-for>
-        <sc-if value="{{ hasAccessUsers }}"><span></span></sc-if>
-        <sc-if value="{{ noAccessUsers }}">
-          <div style="padding:22px; text-align:center; color:#4d5b6b; font-size:12.5px; line-height:1.6;">No member accounts yet.<br>Create accounts from <b style="color:#768493;">Members &amp; access</b>, then grant them here.</div>
-        </sc-if>
-      </div>
-      <div style="padding:13px 22px; border-top:1px solid #1f2c3b; display:flex; justify-content:flex-end;">
-        <button onClick="{{ closeAccess }}" style="font-size:13px; color:#fff; background:#e0454a; border:0; border-radius:7px; padding:8px 16px; cursor:pointer;">Done</button>
-      </div>
     </div>
   </div>
 </sc-if>
@@ -871,7 +865,7 @@ class Component extends DCLogic {
       'onCpCurrent','onCpNew','onCpConfirm','submitChangePassword',
       'goMembers','loadMembers','openInvite','closeInvite','onInviteEmail','submitInvite',
       'promoteMember','demoteMember','resetMemberPw','dismissNudge',
-      'openAccess','closeAccess','loadAccess',
+      'goAccess','loadAccess',
       'selectProvider','providerNext','onHost','testConn','setupBack','finishSetup','selectChatModel',
       'createSpace','newChat','onDraft','onKey','send','stopStream',
       'toggleConvMenu','closeConvMenu','onConvSearch',
@@ -1040,13 +1034,14 @@ class Component extends DCLogic {
   }
 
   // ---------- per-space access (admin manages who reaches THIS space) ----------
-  async openAccess(){
-    const sp = this.state.spaces.find(s=>s.id===this.state.spaceId);
+  // The Access tab: switch the active space's view and load its members.
+  async goAccess(spaceId){
+    const id = spaceId || this.state.spaceId;
+    const sp = this.state.spaces.find(s=>s.id===id);
     if (!sp) return;
-    this.setState({ accessOpen:true, accessSpaceId:sp.id, accessSpaceName:sp.name, accessRoles:{}, accessUsers:[] });
+    this.setState({ view:'access', accessSpaceId:sp.id, accessSpaceName:sp.name, accessRoles:{}, accessUsers:[] });
     await this.loadAccess();
   }
-  closeAccess(){ if (this.state.accessBusy) return; this.setState({ accessOpen:false }); }
   async loadAccess(){
     const sid = this.state.accessSpaceId;
     if (!sid) return;
@@ -1656,17 +1651,20 @@ class Component extends DCLogic {
       const chunkTotal = active ? connectorsRaw.reduce((a,c)=>a+(c.chunkCount||0),0) : '';
       const onChat = active && s.view==='chat';
       const onSources = active && s.view==='sources';
+      const onAccess = active && s.view==='access';
       return { id:sp.id, name:sp.name, count: active && chunkTotal ? String(chunkTotal) : '',
         subnavClass: active ? 'kl-subnav open' : 'kl-subnav',
         select:()=>this.selectSpace(sp.id),
         del:(e)=>{ if(e&&e.stopPropagation)e.stopPropagation(); this.askDeleteSpace(sp.id, sp.name); },
         goChat:()=>this.setState({ view:'chat' }), goSources:()=>this.setState({ view:'sources' }),
+        goAccess:()=>this.goAccess(sp.id),
         rowStyle:'display:flex;align-items:center;gap:9px;padding:7px 10px;border-radius:6px;font-size:13px;cursor:pointer;'+(active?'background:rgba(224,69,74,0.13);color:#e0454a;':'color:#aebac8;background:transparent;'),
         dotStyle:'width:8px;height:8px;border-radius:50%;flex:0 0 auto;background:'+spaceColor+';'+(active?'box-shadow:0 0 0 3px rgba(224,69,74,0.18);':''),
         countStyle:'margin-left:auto;font-size:11px;font-family:\'Geist Mono\',monospace;color:'+(active?'#768493':'#4d5b6b')+';',
         delStyle:'flex:0 0 auto;width:18px;height:18px;padding:0;border-radius:4px;background:transparent;border:0;color:'+(active?'#c98a8c':'#4d5b6b')+';cursor:pointer;display:grid;place-items:center;',
-        chatStyle: subBtn(onChat), sourcesStyle: subBtn(onSources),
-        chatIcon: onChat?'#e0454a':'#768493', sourcesIcon: onSources?'#e0454a':'#768493',
+        chatStyle: subBtn(onChat), sourcesStyle: subBtn(onSources), accessStyle: subBtn(onAccess),
+        chatIcon: onChat?'#e0454a':'#768493', sourcesIcon: onSources?'#e0454a':'#768493', accessIcon: onAccess?'#e0454a':'#768493',
+        showAccess: s.userRole==='owner' || s.userRole==='admin',
         sourceCount: active ? String(connectorsRaw.length) : '',
         srcCountStyle:'margin-left:auto;font-size:11px;font-family:\'Geist Mono\',monospace;color:#4d5b6b;' };
     });
@@ -1848,7 +1846,7 @@ class Component extends DCLogic {
       navSources: { style:this.navStyle(s.view==='sources'), icon: s.view==='sources'?'#e0454a':'#768493' },
       navAgents: { style:this.navStyle(false), icon:'#768493' },
       navMembers: { style:this.navStyle(s.view==='members'), icon: s.view==='members'?'#e0454a':'#768493' },
-      isChat: s.view==='chat', isSources: s.view==='sources', isAgents:false, isMembers: s.view==='members',
+      isChat: s.view==='chat', isSources: s.view==='sources', isAgents:false, isMembers: s.view==='members', isAccess: s.view==='access',
       // members & access (admin only)
       canManageMembers, isOwner, membersBusy: s.membersBusy,
       matrixSpaces, matrixRows, hasMatrixSpaces: matrixSpaces.length>0,
@@ -1856,10 +1854,8 @@ class Component extends DCLogic {
       userFooterStyle: (canManageMembers ? '' : 'margin-top:auto;') + 'padding:12px; border-top:1px solid #1f2c3b; display:flex; align-items:center; gap:10px;',
       secondAdminNudge: canManageMembers && adminCount<=1 && s.members.length>0 && !s.nudgeDismissed,
       dismissNudge: this.dismissNudge, openInvite: this.openInvite,
-      // per-space access modal
-      showAccessBtn: canManageMembers && hasActiveSpace,
-      openAccess: this.openAccess, closeAccess: this.closeAccess,
-      accessOpen: s.accessOpen, accessSpaceName: s.accessSpaceName, accessBusy: s.accessBusy,
+      // per-space access tab
+      accessSpaceName: s.accessSpaceName, accessBusy: s.accessBusy,
       accessRows, hasAccessUsers: accessRows.length>0, noAccessUsers: accessRows.length===0,
       // invite / temp-password dialog
       inviteOpen: s.inviteOpen, inviteEmail: s.inviteEmail, onInviteEmail: this.onInviteEmail,
