@@ -191,3 +191,14 @@ export async function destroySession(sessionId: string | undefined | null): Prom
   }
   await prisma.session.deleteMany({ where: { id: sessionId } });
 }
+
+/**
+ * Drop every session for a user, forcing re-login on their next request. Used by
+ * the members flow when a role/password change should take effect immediately
+ * (the app-layer stand-in for the crypto branch's keyring eviction). Access
+ * changes are already effective on the next request — guards re-read the DB — but
+ * this also evicts the live session for a stronger boundary.
+ */
+export async function dropSessionsForUser(userId: string): Promise<void> {
+  await prisma.session.deleteMany({ where: { userId } });
+}
