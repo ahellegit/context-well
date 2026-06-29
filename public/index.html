@@ -855,6 +855,9 @@ class Component extends DCLogic {
   async api(path, opts={}) {
     const res = await fetch(path, {
       credentials: 'same-origin',
+      // Never serve API reads from the browser HTTP cache: a stale GET is why a
+      // freshly-invited member (or just-deleted space) wouldn't show on refetch.
+      cache: 'no-store',
       headers: opts.body ? { 'content-type':'application/json' } : undefined,
       ...opts,
     });
