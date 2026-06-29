@@ -1837,9 +1837,10 @@ class Component extends DCLogic {
       confirmBtnStyle: 'font-size:13px; color:#fff; background:#e0454a; border:0; border-radius:7px; padding:9px 16px; cursor:'+(s.confirmBusy?'wait':'pointer')+'; opacity:'+(s.confirmBusy?'0.7':'1')+';',
       cancelDeleteSpace:this.cancelDeleteSpace, confirmDeleteSpace:this.confirmDeleteSpace,
       promptChars: (s.promptDraft||'').length, promptVarsHint: '{{space.name}} / {{user.name}}',
-      // agents/members (out of scope — empty)
+      // agents (out of scope — empty). NOTE: do not re-add matrixSpaces/matrixRows
+      // here — they are set from real member data above; an empty stub here would
+      // override them (last key wins) and blank the Members table.
       agentCount:'', agentList:[], selectedAgent:null, hasAgents:false, noAgents:true,
-      matrixSpaces:[], matrixRows:[],
       // toast
       toast: s.toast,
     };
