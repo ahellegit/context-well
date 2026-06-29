@@ -37,11 +37,26 @@ export async function requireAuth(request: FastifyRequest, reply: FastifyReply):
 }
 
 /**
- * Register {@link requireAuth} as a guard on the given Fastify instance (intended
- * to be an encapsulated scope, e.g. a plugin that has the protected `/api/*`
- * routes registered under it). Auth routes and static assets must live *outside*
- * this scope so they stay public. The orchestrator owns that wiring.
+ * preHandler that blocks a user who must still change a temporary password from
+ * reaching any protected route (R10). Runs after {@link requireAuth}, so
+ * `request.user` is set. The change-password / logout / me endpoints live in the
+ * public auth scope (not behind this gate), so the user can still rotate their
+ * password and recover. 403s with a distinct code the client routes on.
+ */
+export async function requirePasswordChanged(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+  if (request.user?.mustChangePassword) {
+    await reply.code(403).send({ error: "password_change_required" });
+  }
+}
+
+/**
+ * Register {@link requireAuth} (then {@link requirePasswordChanged}) as guards on
+ * the given Fastify instance (intended to be an encapsulated scope, e.g. a plugin
+ * that has the protected `/api/*` routes registered under it). Auth routes and
+ * static assets must live *outside* this scope so they stay public. The
+ * orchestrator owns that wiring.
  */
 export function registerAuthGuard(app: FastifyInstance): void {
   app.addHook("preHandler", requireAuth);
+  app.addHook("preHandler", requirePasswordChanged);
 }

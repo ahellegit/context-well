@@ -26,18 +26,18 @@ export interface Config {
   port: number;
   sessionSecret: string;
   cookieSecure: boolean;
-  allowRegistration: boolean;
   databaseUrl: string;
   cyborgdbUrl: string;
   ollamaDefaultUrl: string;
 }
 
+// Note: open self-registration was removed with app-layer RBAC — accounts are
+// admin-provisioned and `/register` is bootstrap-only. No ALLOW_REGISTRATION.
 export function loadConfig(): Config {
   return {
     port: Number(optional("PORT", "3000")),
     sessionSecret: required("SESSION_SECRET"),
     cookieSecure: optional("COOKIE_SECURE", "false") === "true",
-    allowRegistration: optional("ALLOW_REGISTRATION", "false") === "true",
     databaseUrl: optional("DATABASE_URL", "file:./prisma/dev.db"),
     cyborgdbUrl: required("CYBORGDB_URL"),
     ollamaDefaultUrl: optional("OLLAMA_DEFAULT_URL", ""),

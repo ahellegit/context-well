@@ -6,8 +6,13 @@
 import type { User } from "@prisma/client";
 
 // The authenticated principal exposed on the request. We deliberately omit the
-// password hash so it can never leak through a handler that echoes `request.user`.
-export type AuthUser = Pick<User, "id" | "email" | "createdAt">;
+// password hash (and the temp-password expiry) so neither can leak through a
+// handler that echoes `request.user`. `workspaceRole` and `mustChangePassword`
+// drive authorization (RBAC) and the forced first-login password change.
+export type AuthUser = Pick<
+  User,
+  "id" | "email" | "createdAt" | "workspaceRole" | "mustChangePassword"
+>;
 
 declare module "fastify" {
   interface FastifyRequest {
