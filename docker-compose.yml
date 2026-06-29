@@ -13,6 +13,12 @@ services:
       DATABASE_URL: file:/data/app.db
     ports:
       - "${PORT:-3000}:3000"
+    # On Linux, host.docker.internal isn't defined by default. Map it to the host
+    # gateway so the container can reach a local Ollama on the host. The app's
+    # SSRF guard blocks private IP literals (192.168/10/172.16 ranges) but allows
+    # this hostname, so host.docker.internal is the supported way in.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - app_data:/data
     depends_on:
