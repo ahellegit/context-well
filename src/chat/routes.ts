@@ -21,6 +21,7 @@
 // prefix.
 
 import type { FastifyInstance, FastifyReply } from "fastify";
+import { requireSpaceRole, spaceFromConversation } from "../auth/space-guard.js";
 import { runTurn, RetrievalError } from "./orchestrator.js";
 
 interface MessageBody {
@@ -38,7 +39,11 @@ function write(reply: FastifyReply, event: string, data: unknown): void {
 
 export default async function chatRoutes(app: FastifyInstance): Promise<void> {
   // Post a message to a conversation and stream the grounded answer (R16/R27).
-  app.post("/api/conversations/:id/messages", async (request, reply) => {
+  // Viewer+ on the conversation's space (viewers may chat).
+  app.post(
+    "/api/conversations/:id/messages",
+    { preHandler: requireSpaceRole("viewer", spaceFromConversation) },
+    async (request, reply) => {
     const { id } = request.params as { id: string };
     const body = (request.body ?? {}) as MessageBody;
 

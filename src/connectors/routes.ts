@@ -9,6 +9,11 @@
 import type { FastifyInstance } from "fastify";
 import type { Connector } from "@prisma/client";
 import { prisma } from "../db/client.js";
+import {
+  requireSpaceRole,
+  spaceFromConnector,
+  spaceFromParam,
+} from "../auth/space-guard.js";
 import { getSpace } from "../spaces/service.js";
 import {
   deleteVectors,
@@ -80,8 +85,8 @@ function spaceRef(space: {
 export default async function connectorsRoutes(
   app: FastifyInstance,
 ): Promise<void> {
-  // List a space's connectors (credentials masked, R29).
-  app.get("/api/spaces/:id/connectors", async (request, reply) => {
+  // List a space's connectors (credentials masked, R29). Viewer+ (read).
+  app.get("/api/spaces/:id/connectors", { preHandler: requireSpaceRole("viewer", spaceFromParam) }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const space = await getSpace(id);
     if (!space) return reply.code(404).send({ error: "Space not found." });
@@ -94,8 +99,8 @@ export default async function connectorsRoutes(
   });
 
   // Add a connector to a space (R14). Stores credentials server-side; the
-  // response is masked.
-  app.post("/api/spaces/:id/connectors", async (request, reply) => {
+  // response is masked. Editor+ on the space.
+  app.post("/api/spaces/:id/connectors", { preHandler: requireSpaceRole("editor", spaceFromParam) }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const space = await getSpace(id);
     if (!space) return reply.code(404).send({ error: "Space not found." });
@@ -124,7 +129,7 @@ export default async function connectorsRoutes(
   // Validate a connector's credentials (R29 scope check lives in the impl).
   // Accepts optional credentials in the body to validate before saving;
   // otherwise validates the stored credentials.
-  app.post("/api/connectors/:id/validate", async (request, reply) => {
+  app.post("/api/connectors/:id/validate", { preHandler: requireSpaceRole("editor", spaceFromConnector) }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const connector = await prisma.connector.findUnique({ where: { id } });
     if (!connector) return reply.code(404).send({ error: "Connector not found." });
@@ -152,7 +157,7 @@ export default async function connectorsRoutes(
   });
 
   // List the targets a connector's credentials can ingest.
-  app.get("/api/connectors/:id/targets", async (request, reply) => {
+  app.get("/api/connectors/:id/targets", { preHandler: requireSpaceRole("editor", spaceFromConnector) }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const connector = await prisma.connector.findUnique({ where: { id } });
     if (!connector) return reply.code(404).send({ error: "Connector not found." });
@@ -167,7 +172,8 @@ export default async function connectorsRoutes(
   });
 
   // Trigger a sync (R15). 409 when a sync already holds the space lock (R24).
-  app.post("/api/connectors/:id/sync", async (request, reply) => {
+  // Editor+ on the connector's space (ingest is a write).
+  app.post("/api/connectors/:id/sync", { preHandler: requireSpaceRole("editor", spaceFromConnector) }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const connector = await prisma.connector.findUnique({ where: { id } });
     if (!connector) return reply.code(404).send({ error: "Connector not found." });
@@ -186,7 +192,8 @@ export default async function connectorsRoutes(
   });
 
   // Delete a connector and purge its vectors from the index (R23 cleanup).
-  app.delete("/api/connectors/:id", async (request, reply) => {
+  // Editor+ on the connector's space.
+  app.delete("/api/connectors/:id", { preHandler: requireSpaceRole("editor", spaceFromConnector) }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const connector = await prisma.connector.findUnique({ where: { id } });
     if (!connector) return reply.code(404).send({ error: "Connector not found." });

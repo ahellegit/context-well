@@ -8,6 +8,12 @@
 
 import type { FastifyInstance } from "fastify";
 import {
+  requireSpaceRole,
+  requireWorkspaceRole,
+  spaceFromConversation,
+  spaceFromParam,
+} from "../auth/space-guard.js";
+import {
   appendMessage,
   createConversation,
   createSpace,
@@ -16,7 +22,7 @@ import {
   getSpace,
   listConversations,
   listDocuments,
-  listSpaces,
+  listSpacesForUser,
   publicSpace,
   updateCustomPrompt,
 } from "./service.js";
@@ -34,13 +40,15 @@ interface CreateConversationBody {
 }
 
 export default async function spacesRoutes(app: FastifyInstance): Promise<void> {
-  // List all spaces (indexKey stripped — never crosses the API boundary, R29).
-  app.get("/api/spaces", async () => {
-    return (await listSpaces()).map(publicSpace);
+  // List spaces visible to the caller (R7): all for admin/owner, member spaces
+  // otherwise. indexKey stripped — never crosses the API boundary (R29/R8).
+  app.get("/api/spaces", async (request) => {
+    const user = request.user!;
+    return (await listSpacesForUser(user.id, user.workspaceRole)).map(publicSpace);
   });
 
-  // Create a space (provisions its CyborgDB index, R7).
-  app.post("/api/spaces", async (request, reply) => {
+  // Create a space (provisions its CyborgDB index, R7). Admin/owner only.
+  app.post("/api/spaces", { preHandler: requireWorkspaceRole("admin") }, async (request, reply) => {
     const body = (request.body ?? {}) as CreateSpaceBody;
     if (typeof body.name !== "string" || body.name.trim().length === 0) {
       return reply.code(400).send({ error: "A non-empty name is required." });
@@ -49,8 +57,8 @@ export default async function spacesRoutes(app: FastifyInstance): Promise<void> 
     return reply.code(201).send(publicSpace(space));
   });
 
-  // Delete a space (tears down its index, then cascades rows, R7).
-  app.delete("/api/spaces/:id", async (request, reply) => {
+  // Delete a space (tears down its index, then cascades rows, R7). Admin/owner only.
+  app.delete("/api/spaces/:id", { preHandler: requireWorkspaceRole("admin") }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const space = await getSpace(id);
     if (!space) {
@@ -60,8 +68,8 @@ export default async function spacesRoutes(app: FastifyInstance): Promise<void> 
     return reply.code(204).send();
   });
 
-  // Update the raw custom-prompt template (R20).
-  app.put("/api/spaces/:id/prompt", async (request, reply) => {
+  // Update the raw custom-prompt template (R20). Editor+ on the space.
+  app.put("/api/spaces/:id/prompt", { preHandler: requireSpaceRole("editor", spaceFromParam) }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const body = (request.body ?? {}) as PromptBody;
     if (typeof body.prompt !== "string") {
@@ -75,8 +83,8 @@ export default async function spacesRoutes(app: FastifyInstance): Promise<void> 
     return reply.code(200).send({ customPrompt: updated.customPrompt });
   });
 
-  // List the documents currently indexed in a space (files in context).
-  app.get("/api/spaces/:id/documents", async (request, reply) => {
+  // List the documents currently indexed in a space (files in context). Viewer+.
+  app.get("/api/spaces/:id/documents", { preHandler: requireSpaceRole("viewer", spaceFromParam) }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const space = await getSpace(id);
     if (!space) {
@@ -85,8 +93,8 @@ export default async function spacesRoutes(app: FastifyInstance): Promise<void> 
     return listDocuments(id);
   });
 
-  // List a space's conversations (R19).
-  app.get("/api/spaces/:id/conversations", async (request, reply) => {
+  // List a space's conversations (R19). Viewer+.
+  app.get("/api/spaces/:id/conversations", { preHandler: requireSpaceRole("viewer", spaceFromParam) }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const space = await getSpace(id);
     if (!space) {
@@ -95,8 +103,8 @@ export default async function spacesRoutes(app: FastifyInstance): Promise<void> 
     return listConversations(id);
   });
 
-  // Start a new conversation in a space (R19).
-  app.post("/api/spaces/:id/conversations", async (request, reply) => {
+  // Start a new conversation in a space (R19). Viewer+ (viewers may chat).
+  app.post("/api/spaces/:id/conversations", { preHandler: requireSpaceRole("viewer", spaceFromParam) }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const space = await getSpace(id);
     if (!space) {
@@ -108,8 +116,8 @@ export default async function spacesRoutes(app: FastifyInstance): Promise<void> 
     return reply.code(201).send(conversation);
   });
 
-  // Reopen a conversation with its messages (R19).
-  app.get("/api/conversations/:id", async (request, reply) => {
+  // Reopen a conversation with its messages (R19). Viewer+ on its space.
+  app.get("/api/conversations/:id", { preHandler: requireSpaceRole("viewer", spaceFromConversation) }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const conversation = await getConversation(id);
     if (!conversation) {

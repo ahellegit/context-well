@@ -160,6 +160,17 @@ describe("spacesRoutes — indexKey never crosses the API boundary (R29)", () =>
 
   beforeEach(async () => {
     app = Fastify();
+    // The real app sets request.user via the protected-scope auth guard; stub an
+    // owner here so the new RBAC route guards (U3) pass and we can assert R29.
+    app.addHook("preHandler", async (req) => {
+      req.user = {
+        id: "test-owner",
+        email: "owner@test.local",
+        createdAt: new Date(),
+        workspaceRole: "owner",
+        mustChangePassword: false,
+      };
+    });
     await app.register(spacesRoutes);
     await app.ready();
   });

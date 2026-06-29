@@ -9,6 +9,7 @@
 
 import type { FastifyInstance } from "fastify";
 import type { MultipartFile } from "@fastify/multipart";
+import { requireSpaceRole, spaceFromParam } from "../auth/space-guard.js";
 import { getSpace } from "../spaces/service.js";
 import { SyncInProgressError } from "../connectors/sync.js";
 import { ingestFiles, type UploadFile } from "./service.js";
@@ -38,7 +39,8 @@ function isAllowedFilename(filename: string): boolean {
 
 export default async function uploadsRoutes(app: FastifyInstance): Promise<void> {
   // Upload one or more text files into a space (multipart, field name "files").
-  app.post("/api/spaces/:id/upload", async (request, reply) => {
+  // Editor+ on the space (ingest is a write).
+  app.post("/api/spaces/:id/upload", { preHandler: requireSpaceRole("editor", spaceFromParam) }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const space = await getSpace(id);
     if (!space) return reply.code(404).send({ error: "Space not found." });

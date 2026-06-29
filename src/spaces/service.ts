@@ -106,6 +106,20 @@ export function listSpaces(): Promise<Space[]> {
   return prisma.space.findMany({ orderBy: { createdAt: "desc" } });
 }
 
+/**
+ * Spaces visible to a caller (R7): every space for a workspace owner/admin, and
+ * only spaces the caller is a member of otherwise. Newest first.
+ */
+export function listSpacesForUser(userId: string, workspaceRole: string): Promise<Space[]> {
+  if (workspaceRole === "owner" || workspaceRole === "admin") {
+    return listSpaces();
+  }
+  return prisma.space.findMany({
+    where: { memberships: { some: { userId } } },
+    orderBy: { createdAt: "desc" },
+  });
+}
+
 /** A single space by id, or null if it does not exist. */
 export function getSpace(id: string): Promise<Space | null> {
   return prisma.space.findUnique({ where: { id } });
