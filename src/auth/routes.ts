@@ -73,6 +73,13 @@ function readSessionId(request: { cookies: Record<string, string | undefined>; u
 }
 
 export default async function authRoutes(app: FastifyInstance): Promise<void> {
+  // GET /bootstrap-status — public. Tells the client whether the workspace still
+  // needs its first (owner) account, so the auth screen shows "create owner" vs
+  // "sign in" without a user-facing register toggle (R9).
+  app.get("/bootstrap-status", async () => {
+    return { needsBootstrap: await isFirstAccount() };
+  });
+
   // POST /register — bootstrap-only (R9). The very first account creates the
   // workspace owner and is logged straight in. Once any user exists this route
   // is closed (403) regardless of any config flag; further accounts come only
