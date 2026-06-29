@@ -405,6 +405,9 @@
       <div style="height:54px; border-bottom:1px solid #1f2c3b; display:flex; align-items:center; gap:10px; padding:0 22px; flex:0 0 auto;">
         <span style="{{ headerDotStyle }}"></span><b style="font-size:14px;">{{ spaceName }}</b>
         <span style="font-size:11px; color:#768493; font-family:'Geist Mono',monospace;">· sources &amp; behavior</span>
+        <sc-if value="{{ showAccessBtn }}">
+          <span onClick="{{ openAccess }}" title="Manage who can access this space" style="margin-left:auto; display:inline-flex; align-items:center; gap:7px; font-size:12px; color:#aebac8; background:#0e1620; border:1px solid #2a3a4c; border-radius:7px; padding:6px 12px; cursor:pointer;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>Access</span>
+        </sc-if>
       </div>
       <div style="flex:1; overflow-y:auto; padding:24px 26px; min-height:0;">
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:24px; max-width:1100px;">
@@ -590,7 +593,7 @@
       <div style="height:54px; border-bottom:1px solid #1f2c3b; display:flex; align-items:center; gap:10px; padding:0 22px; flex:0 0 auto;">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#e0454a" stroke-width="1.8"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
         <b style="font-size:14px;">Members &amp; access</b>
-        <span style="font-size:11px; color:#768493; font-family:'Geist Mono',monospace;">· click a space cell to cycle no-access → viewer → editor</span>
+        <span style="font-size:11px; color:#768493; font-family:'Geist Mono',monospace;">· accounts &amp; workspace roles · grant space access from inside each space</span>
         <span onClick="{{ openInvite }}" style="margin-left:auto; display:inline-flex;align-items:center;gap:7px;font-size:12px;color:#fff;background:#e0454a;border-radius:7px;padding:6px 12px;cursor:pointer;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>New account</span>
       </div>
       <sc-if value="{{ secondAdminNudge }}">
@@ -605,8 +608,8 @@
           <thead>
             <tr style="border-bottom:1px solid #1f2c3b;">
               <th style="text-align:left; padding:13px 22px; font-size:10px; color:#768493; font-weight:500; letter-spacing:0.08em; text-transform:uppercase; font-family:'Geist Mono',monospace;">Member</th>
-              <th style="text-align:center; padding:13px 10px; font-size:10px; color:#768493; font-weight:500; letter-spacing:0.08em; text-transform:uppercase; font-family:'Geist Mono',monospace;">Workspace</th>
-              <sc-for list="{{ matrixSpaces }}" as="ms"><th style="text-align:center; padding:13px 10px; font-size:11px; font-weight:500; color:#e8eef5;"><span style="display:inline-flex;align-items:center;gap:6px;"><span style="width:7px;height:7px;border-radius:50%;background:{{ ms.color }};"></span>{{ ms.name }}</span></th></sc-for>
+              <th style="text-align:center; padding:13px 10px; font-size:10px; color:#768493; font-weight:500; letter-spacing:0.08em; text-transform:uppercase; font-family:'Geist Mono',monospace;">Workspace role</th>
+              <th style="text-align:center; padding:13px 10px; font-size:10px; color:#768493; font-weight:500; letter-spacing:0.08em; text-transform:uppercase; font-family:'Geist Mono',monospace;">Access</th>
               <th style="text-align:right; padding:13px 22px; font-size:10px; color:#768493; font-weight:500; letter-spacing:0.08em; text-transform:uppercase; font-family:'Geist Mono',monospace;">Actions</th>
             </tr>
           </thead>
@@ -621,9 +624,7 @@
                   </div>
                 </td>
                 <td style="text-align:center;"><span style="{{ r.wsStyle }}">{{ r.wsLabel }}</span></td>
-                <sc-for list="{{ r.cells }}" as="c">
-                  <td style="text-align:center;"><span onClick="{{ c.click }}" style="{{ c.style }}">{{ c.label }}</span></td>
-                </sc-for>
+                <td style="text-align:center; font-size:11.5px; color:#768493; font-family:'Geist Mono',monospace;">{{ r.spacesLabel }}</td>
                 <td style="text-align:right; padding:12px 22px; white-space:nowrap;">
                   <span onClick="{{ r.reset }}" style="font-size:11px;color:#768493;cursor:pointer;margin-right:12px;">Reset pw</span>
                   <sc-if value="{{ r.canPromote }}"><span onClick="{{ r.promote }}" style="font-size:11px;color:#60a5fa;cursor:pointer;">Make admin</span></sc-if>
@@ -733,6 +734,37 @@
   </div>
 </sc-if>
 
+<!-- ========= SPACE ACCESS (per-space members) ========= -->
+<sc-if value="{{ accessOpen }}">
+  <div onClick="{{ closeAccess }}" style="position:fixed; inset:0; background:rgba(2,6,11,0.65); backdrop-filter:blur(4px); display:grid; place-items:center; z-index:100; padding:20px;">
+    <div onClick="{{ stop }}" style="width:540px; max-width:100%; max-height:80vh; background:#0a1118; border:1px solid #2a3a4c; border-radius:16px; box-shadow:0 24px 64px rgba(0,0,0,0.6); overflow:hidden; display:flex; flex-direction:column;">
+      <div style="padding:20px 22px 14px; border-bottom:1px solid #1f2c3b; display:flex; align-items:flex-start; gap:12px;">
+        <span style="width:32px;height:32px;border-radius:8px;background:rgba(224,69,74,0.13);display:grid;place-items:center;flex:0 0 auto;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#e0454a" stroke-width="1.8"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
+        <div style="flex:1;"><h3 style="font-size:15px; font-weight:600; margin:0;">Access · {{ accessSpaceName }}</h3><p style="color:#768493; font-size:12px; margin:4px 0 0; line-height:1.5;">Choose who can reach this space. Viewer = chat &amp; read; Editor = also ingest &amp; manage sources. Owners and admins always have access.</p></div>
+        <button onClick="{{ closeAccess }}" style="width:30px;height:30px;border-radius:6px;background:transparent;border:0;color:#768493;cursor:pointer;display:grid;place-items:center;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+      </div>
+      <div style="padding:8px 0; overflow-y:auto;">
+        <sc-for list="{{ accessRows }}" as="a" hint-placeholder-count="3">
+          <div style="display:flex; align-items:center; gap:11px; padding:9px 22px;">
+            <span style="width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,#60a5fa,#a78bfa);display:grid;place-items:center;font-size:9.5px;font-weight:600;color:rgba(0,0,0,0.78);flex:0 0 auto;">{{ a.initials }}</span>
+            <span style="flex:1; min-width:0; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ a.email }}</span>
+            <span onClick="{{ a.setNone }}" style="{{ a.noneStyle }}">none</span>
+            <span onClick="{{ a.setViewer }}" style="{{ a.viewerStyle }}">viewer</span>
+            <span onClick="{{ a.setEditor }}" style="{{ a.editorStyle }}">editor</span>
+          </div>
+        </sc-for>
+        <sc-if value="{{ hasAccessUsers }}"><span></span></sc-if>
+        <sc-if value="{{ noAccessUsers }}">
+          <div style="padding:22px; text-align:center; color:#4d5b6b; font-size:12.5px; line-height:1.6;">No member accounts yet.<br>Create accounts from <b style="color:#768493;">Members &amp; access</b>, then grant them here.</div>
+        </sc-if>
+      </div>
+      <div style="padding:13px 22px; border-top:1px solid #1f2c3b; display:flex; justify-content:flex-end;">
+        <button onClick="{{ closeAccess }}" style="font-size:13px; color:#fff; background:#e0454a; border:0; border-radius:7px; padding:8px 16px; cursor:pointer;">Done</button>
+      </div>
+    </div>
+  </div>
+</sc-if>
+
 <!-- ========= TOAST ========= -->
 <sc-if value="{{ toast }}">
   <div style="position:fixed; bottom:20px; right:20px; z-index:200; background:#131c28; border:1px solid #38495c; border-radius:8px; padding:10px 14px 10px 11px; font-size:13px; box-shadow:0 8px 24px rgba(0,0,0,0.4); display:flex; align-items:center; gap:9px;">
@@ -784,6 +816,11 @@ class Component extends DCLogic {
       membersBusy: false,
       inviteOpen: false, inviteEmail: '', inviteBusy: false, inviteResult: null,
       nudgeDismissed: false,
+      // per-space access modal (admin manages who can reach the current space)
+      accessOpen: false, accessSpaceId: null, accessSpaceName: '',
+      accessRoles: {},              // userId -> 'viewer'|'editor' for the open space
+      accessUsers: [],              // all 'member' users to choose from [{id,email}]
+      accessBusy: false,
       // setup wizard
       setupStep: 'provider',        // 'provider' | 'connect'
       provider: 'ollama',
@@ -834,6 +871,7 @@ class Component extends DCLogic {
       'onCpCurrent','onCpNew','onCpConfirm','submitChangePassword',
       'goMembers','loadMembers','openInvite','closeInvite','onInviteEmail','submitInvite',
       'promoteMember','demoteMember','resetMemberPw','dismissNudge',
+      'openAccess','closeAccess','loadAccess',
       'selectProvider','providerNext','onHost','testConn','setupBack','finishSetup','selectChatModel',
       'createSpace','newChat','onDraft','onKey','send','stopStream',
       'toggleConvMenu','closeConvMenu','onConvSearch',
@@ -998,6 +1036,40 @@ class Component extends DCLogic {
     this.setState({ inviteBusy:false });
     if (!r.ok) { this.flash(r.status===409 ? 'That email already has an account.' : 'Could not create the account.'); return; }
     this.setState({ inviteResult: { email, tempPassword: r.body.tempPassword, reset:false } });
+    await this.loadMembers();
+  }
+
+  // ---------- per-space access (admin manages who reaches THIS space) ----------
+  async openAccess(){
+    const sp = this.state.spaces.find(s=>s.id===this.state.spaceId);
+    if (!sp) return;
+    this.setState({ accessOpen:true, accessSpaceId:sp.id, accessSpaceName:sp.name, accessRoles:{}, accessUsers:[] });
+    await this.loadAccess();
+  }
+  closeAccess(){ if (this.state.accessBusy) return; this.setState({ accessOpen:false }); }
+  async loadAccess(){
+    const sid = this.state.accessSpaceId;
+    if (!sid) return;
+    this.setState({ accessBusy:true });
+    const [mem, users] = await Promise.all([
+      this.apiJson('/api/spaces/'+sid+'/members'),
+      this.apiJson('/api/members'),
+    ]);
+    const roles = {};
+    if (mem.ok && Array.isArray(mem.body)) mem.body.forEach(m=>{ roles[m.userId]=m.role; });
+    // Only plain members are granted per-space access; owners/admins reach all.
+    const candidates = (users.ok && Array.isArray(users.body) ? users.body : []).filter(u=>u.workspaceRole==='member');
+    this.setState({ accessBusy:false, accessRoles:roles, accessUsers:candidates.map(u=>({ id:u.id, email:u.email })) });
+  }
+  // Set or clear a user's role on the open space ('' removes access).
+  async setAccess(userId, role){
+    const sid = this.state.accessSpaceId;
+    if (!sid) return;
+    let r;
+    if (role==='') r = await this.api('/api/members/'+userId+'/roles/'+sid, { method:'DELETE' });
+    else r = await this.apiJson('/api/members/'+userId+'/roles', { method:'POST', body: JSON.stringify({ spaceId: sid, role }) });
+    if (!r.ok) { this.flash('Could not update access.'); return; }
+    await this.loadAccess();
     await this.loadMembers();
   }
 
@@ -1716,21 +1788,29 @@ class Component extends DCLogic {
     const matrixRows = s.members.map((mem, i) => {
       const ws = mem.workspaceRole || 'member';
       const isWsAdmin = ws==='owner' || ws==='admin';
-      const bySpace = {}; (mem.memberships||[]).forEach(m=>{ bySpace[m.spaceId]=m.role; });
-      const cells = s.spaces.map(sp => {
-        if (isWsAdmin) return { label:'all', style:'display:inline-block;min-width:62px;font-size:11px;font-family:\'Geist Mono\',monospace;color:#4d5b6b;', click:()=>{} };
-        const role = bySpace[sp.id] || '';
-        return { label: role || '—', style: cellStyle(role), click: ()=>this.cycleCell(mem.id, sp.id, role) };
-      });
+      const nSpaces = (mem.memberships||[]).length;
       return {
         id:mem.id, email:mem.email, name:(mem.email||'').split('@')[0], initials:(mem.email||'?').slice(0,2).toUpperCase(),
         grad: GRADS[i % GRADS.length], wsLabel: ws, wsStyle: wsBadgeStyle(ws),
+        // Per-space access is managed inside each space, so here just summarize.
+        spacesLabel: isWsAdmin ? 'all spaces' : (nSpaces===0 ? 'no spaces' : (nSpaces+(nSpaces===1?' space':' spaces'))),
         canPromote: isOwner && ws==='member', canDemote: isOwner && ws==='admin',
         promote: ()=>this.promoteMember(mem.id), demote: ()=>this.demoteMember(mem.id), reset: ()=>this.resetMemberPw(mem.id),
         pending: !!mem.mustChangePassword,
       };
     });
     const adminCount = s.members.filter(m=>m.workspaceRole==='owner'||m.workspaceRole==='admin').length;
+
+    // Per-space access modal rows: each member user with a None/Viewer/Editor pill.
+    const accessPill = (on, color) => 'display:inline-block;font-size:11px;font-family:\'Geist Mono\',monospace;border-radius:999px;padding:3px 11px;cursor:pointer;margin-left:6px;'+(on?('color:'+color+';border:1px solid '+color+'55;background:'+color+'22;'):'color:#4d5b6b;border:1px solid #2a3a4c;background:transparent;');
+    const accessRows = s.accessUsers.map(u => {
+      const role = s.accessRoles[u.id] || '';
+      return {
+        userId:u.id, email:u.email, initials:(u.email||'?').slice(0,2).toUpperCase(),
+        noneStyle: accessPill(role==='', '#768493'), viewerStyle: accessPill(role==='viewer', '#60a5fa'), editorStyle: accessPill(role==='editor', '#2dd4bf'),
+        setNone: ()=>this.setAccess(u.id, ''), setViewer: ()=>this.setAccess(u.id, 'viewer'), setEditor: ()=>this.setAccess(u.id, 'editor'),
+      };
+    });
 
     return {
       // gate: render nothing meaningful until bootstrap resolves
@@ -1776,6 +1856,11 @@ class Component extends DCLogic {
       userFooterStyle: (canManageMembers ? '' : 'margin-top:auto;') + 'padding:12px; border-top:1px solid #1f2c3b; display:flex; align-items:center; gap:10px;',
       secondAdminNudge: canManageMembers && adminCount<=1 && s.members.length>0 && !s.nudgeDismissed,
       dismissNudge: this.dismissNudge, openInvite: this.openInvite,
+      // per-space access modal
+      showAccessBtn: canManageMembers && hasActiveSpace,
+      openAccess: this.openAccess, closeAccess: this.closeAccess,
+      accessOpen: s.accessOpen, accessSpaceName: s.accessSpaceName, accessBusy: s.accessBusy,
+      accessRows, hasAccessUsers: accessRows.length>0, noAccessUsers: accessRows.length===0,
       // invite / temp-password dialog
       inviteOpen: s.inviteOpen, inviteEmail: s.inviteEmail, onInviteEmail: this.onInviteEmail,
       submitInvite: this.submitInvite, closeInvite: this.closeInvite,
