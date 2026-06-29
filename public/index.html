@@ -646,13 +646,12 @@
       <div style="height:54px; border-bottom:1px solid #1f2c3b; display:flex; align-items:center; gap:10px; padding:0 22px; flex:0 0 auto;">
         <span style="{{ headerDotStyle }}"></span><b style="font-size:14px;">{{ accessSpaceName }}</b>
         <span style="font-size:11px; color:#768493; font-family:'Geist Mono',monospace;">· who can access this space</span>
+        <span onClick="{{ openAddDrawer }}" style="margin-left:auto; display:inline-flex; align-items:center; gap:7px; font-size:12px; color:#fff; background:#e0454a; border-radius:7px; padding:6px 12px; cursor:pointer;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM19 8v6M22 11h-6"/></svg>Add member</span>
       </div>
       <div style="flex:1; overflow-y:auto; min-height:0; padding:20px 0;">
         <div style="max-width:760px; margin:0 auto; padding:0 26px;">
-          <p style="color:#768493; font-size:12.5px; line-height:1.6; margin:0 0 18px;"><b style="color:#aebac8;">Chat only</b> = chat &amp; read this space. <b style="color:#aebac8;">Source management</b> = also ingest &amp; manage its sources. Owners and admins always have full access.</p>
+          <p style="color:#768493; font-size:12.5px; line-height:1.6; margin:0 0 18px;"><b style="color:#aebac8;">Chat only access</b> = chat &amp; read this space. <b style="color:#aebac8;">Chat and source access</b> = also ingest &amp; manage its sources. Owners and admins always have full access.</p>
 
-          <!-- people with access -->
-          <div style="font-size:10px; letter-spacing:0.1em; color:#768493; text-transform:uppercase; font-family:'Geist Mono',monospace; margin:0 0 10px;">With access</div>
           <sc-for list="{{ accessAdminRows }}" as="a">
             <div style="display:flex; align-items:center; gap:12px; padding:11px 14px; border:1px solid #1f2c3b; border-radius:10px; margin-bottom:8px; background:#0a1118;">
               <span style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#fb7185,#f59e0b);display:grid;place-items:center;font-size:10px;font-weight:600;color:rgba(0,0,0,0.78);flex:0 0 auto;">{{ a.initials }}</span>
@@ -665,25 +664,14 @@
               <span style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#60a5fa,#a78bfa);display:grid;place-items:center;font-size:10px;font-weight:600;color:rgba(0,0,0,0.78);flex:0 0 auto;">{{ a.initials }}</span>
               <span style="flex:1; min-width:0; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ a.email }}</span>
               <span style="display:inline-flex;">
-                <span onClick="{{ a.setChat }}" style="{{ a.chatStyle }}">Chat only</span>
-                <span onClick="{{ a.setSource }}" style="{{ a.sourceStyle }}">Source management</span>
+                <span onClick="{{ a.setChat }}" style="{{ a.chatStyle }}">Chat only access</span>
+                <span onClick="{{ a.setSource }}" style="{{ a.sourceStyle }}">Chat and source access</span>
               </span>
               <span onClick="{{ a.remove }}" title="Remove access" style="margin-left:4px; width:26px;height:26px;border-radius:6px;display:grid;place-items:center;color:#768493;cursor:pointer;flex:0 0 auto;border:1px solid #2a3a4c;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></span>
             </div>
           </sc-for>
-
-          <!-- add a previously-invited user -->
-          <div style="font-size:10px; letter-spacing:0.1em; color:#768493; text-transform:uppercase; font-family:'Geist Mono',monospace; margin:20px 0 10px;">Add a member</div>
-          <sc-for list="{{ accessCandidates }}" as="a" hint-placeholder-count="2">
-            <div style="display:flex; align-items:center; gap:12px; padding:10px 14px; border:1px dashed #243140; border-radius:10px; margin-bottom:8px;">
-              <span style="width:26px;height:26px;border-radius:50%;background:#16202c;display:grid;place-items:center;font-size:9.5px;font-weight:600;color:#aebac8;flex:0 0 auto;">{{ a.initials }}</span>
-              <span style="flex:1; min-width:0; font-size:13px; color:#aebac8; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ a.email }}</span>
-              <span onClick="{{ a.addChat }}" style="{{ a.addChatStyle }}">+ Chat only</span>
-              <span onClick="{{ a.addSource }}" style="{{ a.addSourceStyle }}">+ Source management</span>
-            </div>
-          </sc-for>
-          <sc-if value="{{ noCandidates }}">
-            <div style="padding:18px; text-align:center; color:#4d5b6b; font-size:12.5px; line-height:1.6; border:1px dashed #1f2c3b; border-radius:10px;">No other accounts to add. Invite people in <b style="color:#768493;">Members &amp; access</b>, then add them here.</div>
+          <sc-if value="{{ noGranted }}">
+            <div style="padding:22px; text-align:center; color:#4d5b6b; font-size:12.5px; line-height:1.6; border:1px dashed #1f2c3b; border-radius:10px;">No members added yet. Use <b style="color:#768493;">Add member</b> to give someone access.</div>
           </sc-if>
         </div>
       </div>
@@ -782,6 +770,54 @@
   </div>
 </sc-if>
 
+<!-- ========= ADD-MEMBER DRAWER (per-space access) ========= -->
+<sc-if value="{{ addDrawerOpen }}">
+  <div onClick="{{ closeAddDrawer }}" style="position:fixed; inset:0; background:rgba(2,6,11,0.55); backdrop-filter:blur(3px); z-index:120;">
+    <div onClick="{{ stop }}" style="position:absolute; top:0; right:0; height:100%; width:420px; max-width:92%; background:#0a1118; border-left:1px solid #2a3a4c; box-shadow:-24px 0 64px rgba(0,0,0,0.5); display:flex; flex-direction:column;">
+      <div style="padding:20px 22px 14px; border-bottom:1px solid #1f2c3b; display:flex; align-items:flex-start; gap:12px;">
+        <div style="flex:1;"><h3 style="font-size:15px; font-weight:600; margin:0;">Add a member · {{ accessSpaceName }}</h3><p style="color:#768493; font-size:12px; margin:4px 0 0; line-height:1.5;">Give a previously-invited account access to this space.</p></div>
+        <button onClick="{{ closeAddDrawer }}" style="width:30px;height:30px;border-radius:6px;background:transparent;border:0;color:#768493;cursor:pointer;display:grid;place-items:center;flex:0 0 auto;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+      </div>
+      <div style="flex:1; overflow-y:auto; padding:14px 18px;">
+        <sc-for list="{{ accessCandidates }}" as="a" hint-placeholder-count="3">
+          <div style="padding:11px 12px; border:1px solid #1f2c3b; border-radius:10px; margin-bottom:9px; background:#070a0e;">
+            <div style="display:flex; align-items:center; gap:10px; margin-bottom:9px;">
+              <span style="width:26px;height:26px;border-radius:50%;background:#16202c;display:grid;place-items:center;font-size:9.5px;font-weight:600;color:#aebac8;flex:0 0 auto;">{{ a.initials }}</span>
+              <span style="flex:1; min-width:0; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ a.email }}</span>
+            </div>
+            <div style="display:flex; gap:8px;">
+              <span onClick="{{ a.addChat }}" style="{{ a.addChatStyle }}">+ Chat only access</span>
+              <span onClick="{{ a.addSource }}" style="{{ a.addSourceStyle }}">+ Chat and source access</span>
+            </div>
+          </div>
+        </sc-for>
+        <sc-if value="{{ noCandidates }}">
+          <div style="padding:22px; text-align:center; color:#4d5b6b; font-size:12.5px; line-height:1.6;">No other accounts to add.<br>Invite people in <b style="color:#768493;">Members &amp; access</b>, then add them here.</div>
+        </sc-if>
+      </div>
+      <div style="padding:13px 20px; border-top:1px solid #1f2c3b; display:flex; justify-content:flex-end;">
+        <button onClick="{{ closeAddDrawer }}" style="font-size:13px; color:#aebac8; background:#0e1620; border:1px solid #1f2c3b; border-radius:7px; padding:8px 16px; cursor:pointer;">Done</button>
+      </div>
+    </div>
+  </div>
+</sc-if>
+
+<!-- ========= REMOVE-ACCESS CONFIRM ========= -->
+<sc-if value="{{ removeOpen }}">
+  <div onClick="{{ cancelRemove }}" style="position:fixed; inset:0; background:rgba(2,6,11,0.65); backdrop-filter:blur(4px); display:grid; place-items:center; z-index:130; padding:20px;">
+    <div onClick="{{ stop }}" style="width:440px; max-width:100%; background:#0a1118; border:1px solid #2a3a4c; border-radius:16px; box-shadow:0 24px 64px rgba(0,0,0,0.6); overflow:hidden;">
+      <div style="padding:22px 22px 16px; display:flex; align-items:flex-start; gap:13px;">
+        <span style="width:34px;height:34px;border-radius:8px;background:rgba(224,69,74,0.13);display:grid;place-items:center;flex:0 0 auto;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#e0454a" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></span>
+        <div style="flex:1;"><h3 style="font-size:15.5px; font-weight:600; margin:0;">Remove access?</h3><p style="color:#768493; font-size:12.5px; margin:6px 0 0; line-height:1.55;"><b style="color:#aebac8;">{{ removeEmail }}</b> will lose access to <b style="color:#aebac8;">{{ accessSpaceName }}</b>. Their chats in this space stay private to them but become unreachable until access is restored.</p></div>
+      </div>
+      <div style="padding:14px 22px 18px; display:flex; gap:8px; justify-content:flex-end;">
+        <button onClick="{{ cancelRemove }}" style="font-size:13px; color:#aebac8; background:#0e1620; border:1px solid #1f2c3b; border-radius:7px; padding:9px 15px; cursor:pointer;">Cancel</button>
+        <button onClick="{{ confirmRemove }}" style="font-size:13px; color:#fff; background:#e0454a; border:0; border-radius:7px; padding:9px 16px; cursor:pointer;">Remove access</button>
+      </div>
+    </div>
+  </div>
+</sc-if>
+
 <!-- ========= TOAST ========= -->
 <sc-if value="{{ toast }}">
   <div style="position:fixed; bottom:20px; right:20px; z-index:200; background:#131c28; border:1px solid #38495c; border-radius:8px; padding:10px 14px 10px 11px; font-size:13px; box-shadow:0 8px 24px rgba(0,0,0,0.4); display:flex; align-items:center; gap:9px;">
@@ -833,11 +869,13 @@ class Component extends DCLogic {
       membersBusy: false,
       inviteOpen: false, inviteEmail: '', inviteBusy: false, inviteResult: null,
       nudgeDismissed: false,
-      // per-space access modal (admin manages who can reach the current space)
-      accessOpen: false, accessSpaceId: null, accessSpaceName: '',
+      // per-space access (admin manages who can reach the current space)
+      accessSpaceId: null, accessSpaceName: '',
       accessRoles: {},              // userId -> 'viewer'|'editor' for the open space
-      accessUsers: [],              // all 'member' users to choose from [{id,email}]
+      accessUsers: [],              // all users to render in the access tab
       accessBusy: false,
+      addDrawerOpen: false,         // "add a member" drawer
+      removeTarget: null,           // {userId,email} pending remove-access confirmation
       // setup wizard
       setupStep: 'provider',        // 'provider' | 'connect'
       provider: 'ollama',
@@ -888,7 +926,7 @@ class Component extends DCLogic {
       'onCpCurrent','onCpNew','onCpConfirm','submitChangePassword',
       'goMembers','loadMembers','openInvite','closeInvite','onInviteEmail','submitInvite',
       'promoteMember','demoteMember','resetMemberPw','dismissNudge',
-      'goAccess','loadAccess',
+      'goAccess','loadAccess','openAddDrawer','closeAddDrawer','cancelRemove','confirmRemove',
       'selectProvider','providerNext','onHost','testConn','setupBack','finishSetup','selectChatModel',
       'createSpace','newChat','onDraft','onKey','send','stopStream',
       'toggleConvMenu','closeConvMenu','onConvSearch',
@@ -1093,9 +1131,14 @@ class Component extends DCLogic {
     if (!r.ok) { this.flash('Could not update access for '+who+'.'); return; }
     await this.loadAccess();
     await this.loadMembers();
-    const label = role==='editor' ? 'source management' : 'chat only';
+    const label = role==='editor' ? 'chat and source access' : 'chat only access';
     this.flash(role==='' ? (who+' · access removed') : (who+' · '+label));
   }
+  openAddDrawer(){ this.setState({ addDrawerOpen:true }); }
+  closeAddDrawer(){ this.setState({ addDrawerOpen:false }); }
+  askRemove(userId, email){ this.setState({ removeTarget:{ userId, email } }); }
+  cancelRemove(){ this.setState({ removeTarget:null }); }
+  async confirmRemove(){ const t=this.state.removeTarget; if(!t) return; this.setState({ removeTarget:null }); await this.setAccess(t.userId, ''); }
 
   // ---------- setup wizard ----------
   selectProvider(id){ const p=this.PROVIDERS.find(x=>x.id===id); if(!p||!p.available){ this.flash(p?p.name+' — coming soon':''); return; } this.setState({ provider:id }); }
@@ -1852,7 +1895,8 @@ class Component extends DCLogic {
       if (role) {
         accessGrantedRows.push({ userId:u.id, email:u.email, initials,
           chatStyle: seg(role==='viewer', '#60a5fa', 'l'), sourceStyle: seg(role==='editor', '#2dd4bf', 'r'),
-          setChat: ()=>this.setAccess(u.id, 'viewer'), setSource: ()=>this.setAccess(u.id, 'editor'), remove: ()=>this.setAccess(u.id, '') });
+          setChat: ()=>this.setAccess(u.id, 'viewer'), setSource: ()=>this.setAccess(u.id, 'editor'),
+          remove: ()=>this.askRemove(u.id, u.email) });
       } else {
         accessCandidates.push({ userId:u.id, email:u.email, initials,
           addChatStyle: addBtn('#60a5fa'), addSourceStyle: addBtn('#2dd4bf'),
@@ -1908,7 +1952,11 @@ class Component extends DCLogic {
       accessSpaceName: s.accessSpaceName, accessBusy: s.accessBusy,
       accessAdminRows, accessGrantedRows, accessCandidates,
       hasGranted: accessGrantedRows.length>0, hasCandidates: accessCandidates.length>0,
-      noCandidates: accessCandidates.length===0,
+      noGranted: accessGrantedRows.length===0, noCandidates: accessCandidates.length===0,
+      openAddDrawer: this.openAddDrawer, closeAddDrawer: this.closeAddDrawer, addDrawerOpen: s.addDrawerOpen,
+      // remove-access confirmation
+      removeOpen: !!s.removeTarget, removeEmail: s.removeTarget ? s.removeTarget.email : '',
+      cancelRemove: this.cancelRemove, confirmRemove: this.confirmRemove,
       // invite / temp-password dialog
       inviteOpen: s.inviteOpen, inviteEmail: s.inviteEmail, onInviteEmail: this.onInviteEmail,
       submitInvite: this.submitInvite, closeInvite: this.closeInvite,
