@@ -6,11 +6,20 @@
 services:
   app:
     build: .
-    env_file: .env
+    # .env is optional: a from-scratch user can `docker compose up` with no .env
+    # and configure everything from the UI. Provide a .env only to override the
+    # defaults below (e.g. a custom SESSION_SECRET or a remote Ollama URL).
+    env_file:
+      - path: .env
+        required: false
     environment:
       # Reach cyborgdb-service over the compose network, not localhost.
       CYBORGDB_URL: http://cyborgdb-service:8000
       DATABASE_URL: file:/data/app.db
+      # Pre-fills the setup wizard's Ollama field. host.docker.internal is mapped
+      # via extra_hosts below; the app's SSRF guard allows this hostname (it
+      # blocks private IP literals). Override in .env to point elsewhere.
+      OLLAMA_DEFAULT_URL: ${OLLAMA_DEFAULT_URL:-http://host.docker.internal:11434}
     ports:
       - "${PORT:-3000}:3000"
     # On Linux, host.docker.internal isn't defined by default. Map it to the host
