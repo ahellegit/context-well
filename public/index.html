@@ -27,9 +27,12 @@
   .kl-space-row .kl-space-del { opacity:0; transition:opacity 0.12s ease; }
   .kl-space-row:hover .kl-space-del { opacity:1; }
   .kl-space-del:hover { background:rgba(224,69,74,0.16) !important; color:#e0454a !important; }
-  @keyframes kl-unroll { from { max-height:0; opacity:0; transform:translateY(-3px); } to { max-height:96px; opacity:1; transform:translateY(0); } }
-  .kl-subnav { overflow:hidden; animation:kl-unroll 0.2s ease; }
+  .kl-subnav { overflow:hidden; max-height:0; opacity:0; transform:translateY(-2px); pointer-events:none;
+    transition:max-height .26s cubic-bezier(.4,0,.2,1), opacity .18s ease, transform .26s cubic-bezier(.4,0,.2,1); }
+  .kl-subnav.open { max-height:120px; opacity:1; transform:translateY(0); pointer-events:auto; }
   .kl-subnav button:hover { background:rgba(224,69,74,0.07); }
+  @keyframes kl-fade-in { from { opacity:0; transform:translateY(3px); } to { opacity:1; transform:translateY(0); } }
+  .kl-switch-fade { animation:kl-fade-in .24s cubic-bezier(.4,0,.2,1); }
 </style>
 </helmet>
 
@@ -194,14 +197,12 @@
           <div onClick="{{ sp.select }}" class="kl-space-row" style="{{ sp.rowStyle }}">
             <span style="{{ sp.dotStyle }}"></span>{{ sp.name }}<span style="{{ sp.countStyle }}">{{ sp.count }}</span><button onClick="{{ sp.del }}" class="kl-space-del" title="Delete space" style="{{ sp.delStyle }}"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M10 11v6M14 11v6"/></svg></button>
           </div>
-          <sc-if value="{{ sp.expanded }}">
-            <div class="kl-subnav">
-              <div style="margin:2px 0 5px 13px; padding-left:10px; border-left:1px solid #22303f; display:flex; flex-direction:column; gap:1px;">
-                <button onClick="{{ sp.goChat }}" style="{{ sp.chatStyle }}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="{{ sp.chatIcon }}" stroke-width="1.7"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Chats</button>
-                <button onClick="{{ sp.goSources }}" style="{{ sp.sourcesStyle }}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="{{ sp.sourcesIcon }}" stroke-width="1.7"><path d="m12 2 10 6-10 6L2 8z"/><path d="m2 17 10 6 10-6M2 12l10 6 10-6"/></svg>Sources<span style="{{ sp.srcCountStyle }}">{{ sp.sourceCount }}</span></button>
-              </div>
+          <div class="{{ sp.subnavClass }}">
+            <div style="margin:2px 0 5px 13px; padding-left:10px; border-left:1px solid #22303f; display:flex; flex-direction:column; gap:1px;">
+              <button onClick="{{ sp.goChat }}" style="{{ sp.chatStyle }}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="{{ sp.chatIcon }}" stroke-width="1.7"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Chats</button>
+              <button onClick="{{ sp.goSources }}" style="{{ sp.sourcesStyle }}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="{{ sp.sourcesIcon }}" stroke-width="1.7"><path d="m12 2 10 6-10 6L2 8z"/><path d="m2 17 10 6 10-6M2 12l10 6 10-6"/></svg>Sources<span style="{{ sp.srcCountStyle }}">{{ sp.sourceCount }}</span></button>
             </div>
-          </sc-if>
+          </div>
         </div>
       </sc-for>
       <sc-if value="{{ noSpaces }}">
@@ -227,7 +228,7 @@
 
     <!-- CHAT VIEW -->
     <sc-if value="{{ isChat }}" hint-placeholder-val="{{ true }}">
-      <div style="display:grid; grid-template-columns:1fr 312px; min-height:0; flex:1;">
+      <div class="kl-switch-fade" key="{{ spaceKey }}" style="display:grid; grid-template-columns:1fr 312px; min-height:0; flex:1;">
         <!-- chat column -->
         <div style="display:flex; flex-direction:column; min-width:0; min-height:0; border-right:1px solid #1f2c3b;">
           <div style="height:54px; border-bottom:1px solid #1f2c3b; display:flex; align-items:center; gap:10px; padding:0 18px; flex:0 0 auto; position:relative;">
@@ -276,6 +277,15 @@
             <div style="flex:0 0 auto; display:flex; align-items:center; gap:8px; padding:8px 26px; background:rgba(245,158,11,0.08); border-bottom:1px solid rgba(245,158,11,0.22); font-size:11.5px; color:#f59e0b; font-family:'Geist Mono',monospace;"><span style="width:6px;height:6px;border-radius:50%;background:#f59e0b;animation:kl-blink 1s infinite;flex:0 0 auto;"></span>sources updating — a sync is running for this space</div>
           </sc-if>
           <div data-chat-scroll style="flex:1; overflow-y:auto; padding:24px 26px; display:flex; flex-direction:column; gap:22px; min-height:0;">
+            <!-- switching skeleton (keeps the panel from flashing empty) -->
+            <sc-if value="{{ showChatSkeleton }}">
+              <div style="display:flex; flex-direction:column; gap:18px; width:100%;">
+                <div class="kl-skel" style="height:46px; border-radius:12px; width:54%; align-self:flex-end;"></div>
+                <div class="kl-skel" style="height:78px; border-radius:12px; width:82%;"></div>
+                <div class="kl-skel" style="height:46px; border-radius:12px; width:44%; align-self:flex-end;"></div>
+                <div class="kl-skel" style="height:64px; border-radius:12px; width:74%;"></div>
+              </div>
+            </sc-if>
             <!-- no-connectors empty state -->
             <sc-if value="{{ showNoConnectors }}">
               <div style="margin:auto; text-align:center; max-width:440px; display:flex; flex-direction:column; align-items:center; gap:14px;">
@@ -360,7 +370,7 @@
             <div style="font-size:11.5px; color:#4d5b6b; margin-top:4px;">{{ railSubtitle }}</div>
           </div>
           <div style="flex:1; overflow-y:auto; padding:14px; display:flex; flex-direction:column; gap:10px; min-height:0;">
-            <sc-if value="{{ loading }}">
+            <sc-if value="{{ railBusy }}">
               <div class="kl-skel" style="height:92px;border-radius:9px;"></div>
               <div class="kl-skel" style="height:92px;border-radius:9px;"></div>
               <div class="kl-skel" style="height:92px;border-radius:9px;"></div>
@@ -786,6 +796,7 @@ class Component extends DCLogic {
       setupBusy: false,
       // app
       view: 'chat',
+      switchingSpace: false,        // true while a space switch is loading (skeletons, not empty flash)
       spaces: [],                   // [{id,slug,name,customPrompt,...}]
       spaceId: null,
       connectorsBySpace: {},        // spaceId -> [public connector]
@@ -1060,8 +1071,9 @@ class Component extends DCLogic {
   }
   async selectSpace(id) {
     if (id===this.state.spaceId) { this.setState({ view:'chat' }); return; }
-    this.setState({ spaceId:id, view:'chat', messages:[], railSources:[], citedSet:{}, convMenuOpen:false, addFormOpen:false });
-    await this.loadSpaceData(id);
+    this.setState({ spaceId:id, view:'chat', messages:[], railSources:[], citedSet:{}, convMenuOpen:false, addFormOpen:false, switchingSpace:true });
+    try { await this.loadSpaceData(id); }
+    finally { this.setState({ switchingSpace:false }); }
   }
   createSpace(){ this.setState({ createOpen:true, createName:'', createBusy:false }); }
   cancelCreateSpace(){ if (this.state.createBusy) return; this.setState({ createOpen:false }); }
@@ -1561,15 +1573,16 @@ class Component extends DCLogic {
     const isSyncing = !!s.syncingSpaces[sid];
     const spaceColor = '#e0454a';
 
-    // spaces list. The active space "unrolls" its Chats/Sources sub-nav inline.
+    // spaces list. The active space "unrolls" its Chats/Sources sub-nav inline
+    // (always rendered; .open toggles a CSS height/opacity transition both ways).
     const subBtn = (on)=>'display:flex;align-items:center;gap:9px;padding:6px 10px;border-radius:6px;font:12.5px "Geist";cursor:pointer;border:0;width:100%;text-align:left;background:'+(on?'rgba(224,69,74,0.13)':'transparent')+';color:'+(on?'#e0454a':'#9aa7b5')+';';
     const spaceList = s.spaces.map(sp=>{
       const active = sp.id===sid;
-      const cc = (connectorsRaw && active) ? connectorsRaw.length : '';
       const chunkTotal = active ? connectorsRaw.reduce((a,c)=>a+(c.chunkCount||0),0) : '';
       const onChat = active && s.view==='chat';
       const onSources = active && s.view==='sources';
-      return { id:sp.id, name:sp.name, count: active && chunkTotal ? String(chunkTotal) : '', expanded: active,
+      return { id:sp.id, name:sp.name, count: active && chunkTotal ? String(chunkTotal) : '',
+        subnavClass: active ? 'kl-subnav open' : 'kl-subnav',
         select:()=>this.selectSpace(sp.id),
         del:(e)=>{ if(e&&e.stopPropagation)e.stopPropagation(); this.askDeleteSpace(sp.id, sp.name); },
         goChat:()=>this.setState({ view:'chat' }), goSources:()=>this.setState({ view:'sources' }),
@@ -1678,8 +1691,8 @@ class Component extends DCLogic {
       return { title:d.title, tag:t.label, tagColor:t.color, chunkLabel:(d.chunks||0)+' chunk'+((d.chunks===1)?'':'s') };
     });
     const hasActiveSpace = !!space;
-    const showEmpty = msgs.length===0 && !s.loading && !s.streaming && hasConnectors;
-    const showNoConnectors = msgs.length===0 && !s.loading && !s.streaming && hasActiveSpace && !hasConnectors;
+    const showEmpty = msgs.length===0 && !s.loading && !s.streaming && !s.switchingSpace && hasConnectors;
+    const showNoConnectors = msgs.length===0 && !s.loading && !s.streaming && !s.switchingSpace && hasActiveSpace && !hasConnectors;
     const lastTV = (s.lastTiming && !s.streaming) ? this.timingView(s.lastTiming) : null;
 
     // --- members & access view model (admin only) ---
@@ -1785,6 +1798,7 @@ class Component extends DCLogic {
       modelChip: 'ollama · '+(s.settingsModel||'model'),
       syncingBanner: isSyncing,
       msgs, showEmpty, showNoConnectors,
+      spaceKey: sid || 'none', showChatSkeleton: s.switchingSpace && msgs.length===0,
       loading: s.loading, loadingLabel: s.loadingLabel,
       streaming: s.streaming, notStreaming: !s.streaming,
       draft: s.draft, onDraft:this.onDraft, onKey:this.onKey, send:this.send, stopStream:this.stopStream,
@@ -1792,7 +1806,8 @@ class Component extends DCLogic {
       hasLastTiming: !!lastTV, lastTimingBar: lastTV?lastTV.bar:[], lastTimingLabel: lastTV?lastTV.label:'',
       // rail
       railSubtitle: railSources.length? ('top-k = '+railSources.length+' · ranked by similarity') : 'nothing retrieved yet',
-      railSources, showSources: !s.loading && railSources.length>0, showRailHint: !s.loading && railSources.length===0,
+      railBusy: s.loading || s.switchingSpace,
+      railSources, showSources: !s.loading && !s.switchingSpace && railSources.length>0, showRailHint: !s.loading && !s.switchingSpace && railSources.length===0,
       // sources view
       connectors, noConnectors: !hasConnectors,
       showAddForm: s.addFormOpen, hideAddForm: !s.addFormOpen,
