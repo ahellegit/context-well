@@ -227,6 +227,41 @@ describe("composePrompt injection delimiting (R29 / R20)", () => {
     expect(system.toLowerCase()).toContain("reference data");
   });
 
+  it("feeds the full chunk contents (not the 200-char snippet) into the source block", () => {
+    const full = "FULL CHUNK BODY with the actual upsert example and details ".repeat(8);
+    const h = hit({
+      id: "c1",
+      metadata: { title: "Doc", snippet: "tiny snippet", connector: "github" },
+    });
+    h.contents = full;
+    const composed = composePrompt({
+      customPrompt: "Answer.",
+      vars: {},
+      userText: "how do I upsert?",
+      hits: [h],
+      numCtx: 8192,
+    });
+    const system = composed.messages[0].content;
+    expect(system).toContain("FULL CHUNK BODY");
+    // The truncated display snippet must NOT be what the model sees when full
+    // contents are available.
+    expect(system).not.toContain("tiny snippet");
+  });
+
+  it("falls back to metadata.snippet when a hit has no contents", () => {
+    const h = hit({
+      id: "c2",
+      metadata: { title: "Doc", snippet: "only-the-snippet", connector: "github" },
+    });
+    const composed = composePrompt({
+      customPrompt: "Answer.",
+      vars: {},
+      userText: "q",
+      hits: [h],
+    });
+    expect(composed.messages[0].content).toContain("only-the-snippet");
+  });
+
   it("neutralizes a literal </source n> in a hit so it cannot break out of its delimiter", () => {
     const breakout = hit({
       id: "esc",

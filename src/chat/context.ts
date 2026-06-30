@@ -108,9 +108,14 @@ function neutralizeSourceDelimiter(text: string): string {
 function renderSource(hit: CyborgHit, n: number): string {
   const md = hit.metadata as Record<string, unknown>;
   const title = typeof md.title === "string" ? neutralizeSourceDelimiter(md.title) : "";
-  const snippet = typeof md.snippet === "string" ? neutralizeSourceDelimiter(md.snippet) : "";
+  // Prefer the full chunk text (fetched via get()); fall back to the 200-char
+  // display snippet only when contents are unavailable. Feeding the model the
+  // whole chunk is what lets it actually answer from a high-scoring match.
+  const snippet = typeof md.snippet === "string" ? md.snippet : "";
+  const bodyRaw = hit.contents && hit.contents.length > 0 ? hit.contents : snippet;
+  const body = neutralizeSourceDelimiter(bodyRaw);
   const header = title ? `${title}\n` : "";
-  return `<source ${n}>\n${header}${snippet}\n</source ${n}>`;
+  return `<source ${n}>\n${header}${body}\n</source ${n}>`;
 }
 
 /**

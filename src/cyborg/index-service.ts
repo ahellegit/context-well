@@ -48,6 +48,10 @@ export interface CyborgHit {
   distance: number;
   similarity: number;
   metadata: Record<string, unknown>;
+  // Full chunk text, fetched via get() after the query (query() itself returns
+  // only id/distance/metadata — never contents). Undefined if the fetch failed;
+  // callers fall back to metadata.snippet for display.
+  contents?: string;
 }
 
 /**
@@ -226,7 +230,7 @@ export async function query(
   // For a single text query the SDK flattens `results` to QueryResultItem[].
   const items = (response.results ?? []) as unknown as QueryResultItem[];
 
-  return items.map((item) => {
+  const hits: CyborgHit[] = items.map((item) => {
     const distance = item.distance ?? 1;
     return {
       id: item.id,
@@ -235,6 +239,40 @@ export async function query(
       metadata: (item.metadata ?? {}) as Record<string, unknown>,
     };
   });
+
+  // query() returns no contents — only id/distance/metadata. Fetch the full
+  // chunk text for the hits via get() so the LLM sees the whole chunk, not just
+  // the 200-char display snippet stored in metadata. Best-effort: on failure we
+  // leave contents undefined and callers fall back to the snippet.
+  if (hits.length > 0) {
+    try {
+      const got = await index.get({
+        ids: hits.map((h) => h.id),
+        include: ["contents"],
+      });
+      const byId = new Map<string, string>();
+      for (const g of got) {
+        if (g.contents != null) byId.set(g.id, contentsToString(g.contents));
+      }
+      for (const h of hits) {
+        const c = byId.get(h.id);
+        if (c) h.contents = c;
+      }
+    } catch {
+      // Leave contents undefined; renderSource falls back to metadata.snippet.
+    }
+  }
+
+  return hits;
+}
+
+/** Coerce a get() contents value (Buffer | Blob | string) to a string. */
+function contentsToString(c: Buffer | Blob | string): string {
+  if (typeof c === "string") return c;
+  if (Buffer.isBuffer(c)) return c.toString("utf-8");
+  // A Blob (or anything else) — best-effort string coercion; the service
+  // returns string/Buffer in practice, so this branch is a defensive fallback.
+  return String(c);
 }
 
 /**
