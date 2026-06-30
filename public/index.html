@@ -459,11 +459,14 @@
                     </sc-for>
                   </div>
                   <input value="{{ newCred }}" onInput="{{ onNewCred }}" type="password" placeholder="{{ credPlaceholder }}" style="width:100%; background:#0e1620; border:1px solid #2a3a4c; border-radius:8px; padding:9px 11px; color:#e8eef5; font:12px 'Geist Mono',monospace; outline:none;">
+                  <sc-if value="{{ showTargetInput }}">
+                    <input value="{{ newTargets }}" onInput="{{ onNewTargets }}" type="text" placeholder="{{ targetPlaceholder }}" style="width:100%; margin-top:8px; background:#0e1620; border:1px solid #2a3a4c; border-radius:8px; padding:9px 11px; color:#e8eef5; font:12px 'Geist Mono',monospace; outline:none;">
+                  </sc-if>
                   <div style="display:flex; gap:8px; margin-top:10px;">
                     <button onClick="{{ submitConnector }}" style="font-size:12px; color:#fff; background:#e0454a; border:0; border-radius:7px; padding:8px 14px; cursor:pointer;">Add &amp; save</button>
                     <button onClick="{{ cancelAddForm }}" style="font-size:12px; color:#aebac8; background:#0e1620; border:1px solid #1f2c3b; border-radius:7px; padding:8px 14px; cursor:pointer;">Cancel</button>
                   </div>
-                  <div style="font-size:10.5px; color:#768493; margin-top:9px; line-height:1.5;">After adding, click <b style="color:#aebac8;">Sync</b> to pull targets and ingest. Tokens are stored server-side and never shown back.</div>
+                  <div style="font-size:10.5px; color:#768493; margin-top:9px; line-height:1.5;">After adding, click <b style="color:#aebac8;">Validate</b> then <b style="color:#aebac8;">Sync</b> to ingest the listed targets. Tokens are stored server-side and never shown back.</div>
                 </div>
               </sc-if>
               <sc-if value="{{ hideAddForm }}">
@@ -839,8 +842,8 @@ class Component extends DCLogic {
     ];
     // Connector kinds the backend registers (github, slack). gdoc/files are deferred.
     this.KINDS = [
-      { id:'github', label:'GitHub', credPlaceholder:'GitHub personal access token (contents:read, issues:read)' },
-      { id:'slack', label:'Slack', credPlaceholder:'Slack bot token (channels:history, channels:read, users:read)' },
+      { id:'github', label:'GitHub', credPlaceholder:'GitHub personal access token (contents:read, issues:read)', targetPlaceholder:'Repos to ingest: owner/repo, comma-separated (e.g. facebook/react)' },
+      { id:'slack', label:'Slack', credPlaceholder:'Slack bot token (channels:history, channels:read, users:read)', targetPlaceholder:'Channel IDs to ingest, comma-separated (e.g. C012AB3CD)' },
     ];
     // status enum → display + color
     this.STATUS = {
@@ -912,7 +915,7 @@ class Component extends DCLogic {
       // delete-space confirm dialog
       confirmSpace: null, confirmBusy: false,
       // add-connector form
-      addFormOpen: false, newKind: 'github', newCred: '',
+      addFormOpen: false, newKind: 'github', newCred: '', newTargets: '',
       // file upload
       uploadBusy: false,
       uploadDragging: false,
@@ -934,7 +937,7 @@ class Component extends DCLogic {
       'cancelCreateSpace','onCreateName','onCreateKey','submitCreateSpace',
       'cancelDeleteSpace','confirmDeleteSpace',
       'goChat','goSources',
-      'openAddForm','cancelAddForm','onNewCred','submitConnector',
+      'openAddForm','cancelAddForm','onNewCred','onNewTargets','submitConnector',
       'pickUploadFiles','uploadFiles','onUploadDragOver','onUploadDragLeave','onUploadDrop',
     ].forEach(m => { this[m] = this[m].bind(this); });
     this.stop = (e)=>{ e && e.stopPropagation && e.stopPropagation(); };
@@ -1487,17 +1490,20 @@ class Component extends DCLogic {
   }
 
   // ---------- connectors ----------
-  openAddForm(){ this.setState({ addFormOpen:true, newKind:'github', newCred:'' }); }
-  cancelAddForm(){ this.setState({ addFormOpen:false, newCred:'' }); }
+  openAddForm(){ this.setState({ addFormOpen:true, newKind:'github', newCred:'', newTargets:'' }); }
+  cancelAddForm(){ this.setState({ addFormOpen:false, newCred:'', newTargets:'' }); }
   selectKind(id){ this.setState({ newKind:id }); }
   onNewCred(e){ this.setState({ newCred:e.target.value }); }
+  onNewTargets(e){ this.setState({ newTargets:e.target.value }); }
   async submitConnector(){
     const sid=this.state.spaceId; if(!sid) return;
     if (!this.state.newCred.trim()) { this.flash('Enter the connector credentials first.'); return; }
+    // owner/repo (github) or channel ids (slack), comma-separated → string[].
+    const targets = (this.state.newTargets||'').split(',').map(s=>s.trim()).filter(Boolean);
     const r = await this.apiJson('/api/spaces/'+sid+'/connectors', { method:'POST',
-      body: JSON.stringify({ kind:this.state.newKind, credentials:this.state.newCred, targets:[] }) });
+      body: JSON.stringify({ kind:this.state.newKind, credentials:this.state.newCred, targets }) });
     if (!r.ok) { this.flash('Could not add the connector.'); return; }
-    this.setState({ addFormOpen:false, newCred:'' });
+    this.setState({ addFormOpen:false, newCred:'', newTargets:'' });
     this.flash('Connector added — validate then sync.');
     await this.reloadConnectors();
   }
@@ -1778,7 +1784,10 @@ class Component extends DCLogic {
     });
     const kindOptions = this.KINDS.map(k=>({ id:k.id, label:k.label, select:()=>this.selectKind(k.id),
       style:'flex:1; font-size:12px; border-radius:7px; padding:8px; cursor:pointer; '+(s.newKind===k.id?'background:rgba(224,69,74,0.1);color:#e0454a;border:1px solid rgba(224,69,74,0.4);':'background:#0e1620;color:#aebac8;border:1px solid #1f2c3b;') }));
-    const credPlaceholder = (this.KINDS.find(k=>k.id===s.newKind)||{}).credPlaceholder || 'credentials';
+    const selectedKind = this.KINDS.find(k=>k.id===s.newKind)||{};
+    const credPlaceholder = selectedKind.credPlaceholder || 'credentials';
+    const targetPlaceholder = selectedKind.targetPlaceholder || '';
+    const showTargetInput = !!selectedKind.targetPlaceholder;
     const totalChunks = connectorsRaw.reduce((a,c)=>a+(c.chunkCount||0),0);
 
     // conversation history menu
@@ -1996,6 +2005,7 @@ class Component extends DCLogic {
       connectors, noConnectors: !hasConnectors,
       showAddForm: s.addFormOpen, hideAddForm: !s.addFormOpen,
       kindOptions, credPlaceholder, newCred: s.newCred, onNewCred:this.onNewCred,
+      targetPlaceholder, showTargetInput, newTargets: s.newTargets, onNewTargets:this.onNewTargets,
       openAddForm:this.openAddForm, cancelAddForm:this.cancelAddForm, submitConnector:this.submitConnector,
       pickUploadFiles:this.pickUploadFiles, uploadBusy: s.uploadBusy,
       onUploadDragOver:this.onUploadDragOver, onUploadDragLeave:this.onUploadDragLeave, onUploadDrop:this.onUploadDrop,
