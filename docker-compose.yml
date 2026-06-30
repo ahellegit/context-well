@@ -3,6 +3,10 @@
 # network, "localhost" is the container, so point Ollama at host.docker.internal
 # (Mac/Windows) or your host LAN IP. See .env.example.
 
+# Branch-specific project name so volumes don't collide with other RBAC branches
+# checked out in this same directory (avoids cross-branch Prisma migration corruption).
+name: context-well-rag
+
 services:
   app:
     build: .
