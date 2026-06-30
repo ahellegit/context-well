@@ -306,13 +306,25 @@ async function listTargets(creds: unknown): Promise<ConnectorTarget[]> {
   }));
 }
 
-/** Split "owner/repo" into its parts; throws if malformed. */
+/**
+ * Resolve a repo target to its owner + repo. Accepts the canonical "owner/repo"
+ * but also tolerates a pasted URL — "https://github.com/owner/repo(.git)",
+ * "github.com/owner/repo", or "git@github.com:owner/repo" — so a copied browser
+ * URL just works. Throws if it can't find both an owner and a repo.
+ */
 function splitRepoId(repoId: string): { owner: string; repo: string } {
-  const slash = repoId.indexOf("/");
-  if (slash <= 0 || slash === repoId.length - 1) {
+  const normalized = repoId
+    .trim()
+    .replace(/^https?:\/\//i, "")
+    .replace(/^git@github\.com:/i, "")
+    .replace(/^(www\.)?github\.com\//i, "")
+    .replace(/\.git$/i, "")
+    .replace(/\/+$/, "");
+  const [owner, repo] = normalized.split("/").filter(Boolean);
+  if (!owner || !repo) {
     throw new Error(`Malformed repo id "${repoId}" (expected "owner/repo").`);
   }
-  return { owner: repoId.slice(0, slash), repo: repoId.slice(slash + 1) };
+  return { owner, repo };
 }
 
 /** Fetch a repo's metadata (for the default branch). */

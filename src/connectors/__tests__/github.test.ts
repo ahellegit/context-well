@@ -151,6 +151,22 @@ describe("githubConnector.sync", () => {
     expect(chunks).toHaveLength(0);
   });
 
+  it("accepts a pasted GitHub URL as a target (normalizes to owner/repo)", async () => {
+    vi.stubGlobal("fetch", mockFetch());
+    handlers = [
+      (u) => (/\/repos\/me\/repo$/.test(u) ? { body: { full_name: "me/repo", default_branch: "main" } } : null!),
+      (u) => (u.includes("/git/trees/main") ? { body: repoTree([{ path: "README.md" }]) } : null!),
+      (u) =>
+        u.includes("/git/blobs/")
+          ? { body: { content: Buffer.from("hi").toString("base64"), encoding: "base64" } }
+          : null!,
+      (u) => (u.includes("/issues?state=all") ? { body: [] } : null!),
+    ];
+    const chunks = await collect(githubConnector.sync(TOKEN, ["https://github.com/me/repo"]));
+    expect(chunks.length).toBeGreaterThan(0);
+    expect(chunks.map((c) => c.metadata.ref)).toContain("README.md");
+  });
+
   it("retries on 429 then succeeds", async () => {
     vi.stubGlobal("fetch", mockFetch());
     let userHits = 0;
