@@ -209,6 +209,29 @@ describe("githubConnector.sync", () => {
     expect(issuesCalled).toBe(false);
   });
 
+  it("errors (not silent 0 chunks) when a scoped subpath matches nothing", async () => {
+    vi.stubGlobal("fetch", mockFetch());
+    handlers = [
+      (u) => (/\/repos\/me\/repo$/.test(u) ? { body: { full_name: "me/repo", default_branch: "main" } } : null!),
+      (u) =>
+        u.includes("/git/trees/")
+          ? { body: repoTree([{ path: "versions/v0.17.x/upsert.md" }]) }
+          : null!,
+      (u) => (u.includes("/issues?state=all") ? { body: [] } : null!),
+    ];
+    // Target points at "v0.17" but the repo only has "v0.17.x" → no match → the
+    // single repo fails → sync throws (AggregateError) rather than yielding 0.
+    let err: unknown;
+    try {
+      await collect(githubConnector.sync(TOKEN, ["https://github.com/me/repo/tree/main/versions/v0.17"]));
+    } catch (e) {
+      err = e;
+    }
+    expect(err).toBeInstanceOf(AggregateError);
+    const messages = (err as AggregateError).errors.map((e) => e.message).join(" ");
+    expect(messages).toMatch(/No files found under/);
+  });
+
   it("retries on 429 then succeeds", async () => {
     vi.stubGlobal("fetch", mockFetch());
     let userHits = 0;

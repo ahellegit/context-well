@@ -391,6 +391,16 @@ async function* syncRepoFiles(
   }
   const tree = (await treeRes.json()) as GhTree;
 
+  // A scoped target whose path matches NO tree entry (dir or file) is almost
+  // always a typo (e.g. "versions/v0.17" vs "versions/v0.17.x"). Fail loudly so
+  // it surfaces as an error instead of a silent "connected · 0 chunks". Skipped
+  // when the tree came back truncated, since the path may just be off-page.
+  if (subpath && !tree.truncated && !tree.tree.some((e) => inSubpath(e.path, subpath))) {
+    throw new Error(
+      `No files found under "${subpath}" in ${owner}/${repo}@${branch} — check the folder path.`,
+    );
+  }
+
   for (const entry of tree.tree) {
     if (entry.type !== "blob") continue;
     if (!inSubpath(entry.path, subpath)) continue;
