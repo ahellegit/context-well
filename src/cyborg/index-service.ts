@@ -16,6 +16,7 @@
 import type { EncryptedIndex, QueryResultItem } from "cyborgdb";
 import { cyborgClient, hexToKey, keyToHex } from "./client.js";
 import { prisma } from "../db/client.js";
+import { config } from "../config.js";
 
 // The embedding model is a global constant in v1 (KTD3); Space.embeddingModel
 // stores it per row but is always this value. all-MiniLM-L6-v2 → 384 dims.
@@ -241,38 +242,60 @@ export async function query(
   });
 
   // query() returns no contents — only id/distance/metadata. Fetch the full
-  // chunk text for the hits via get() so the LLM sees the whole chunk, not just
-  // the 200-char display snippet stored in metadata. Best-effort: on failure we
-  // leave contents undefined and callers fall back to the snippet.
+  // chunk text for the hits so the LLM sees the whole chunk, not just the
+  // 200-char display snippet stored in metadata.
   if (hits.length > 0) {
-    try {
-      const got = await index.get({
-        ids: hits.map((h) => h.id),
-        include: ["contents"],
-      });
-      const byId = new Map<string, string>();
-      for (const g of got) {
-        if (g.contents != null) byId.set(g.id, contentsToString(g.contents));
-      }
-      for (const h of hits) {
-        const c = byId.get(h.id);
-        if (c) h.contents = c;
-      }
-    } catch {
-      // Leave contents undefined; renderSource falls back to metadata.snippet.
+    const byId = await fetchContents(space, hits.map((h) => h.id));
+    for (const h of hits) {
+      const c = byId.get(h.id);
+      if (c) h.contents = c;
     }
   }
 
   return hits;
 }
 
-/** Coerce a get() contents value (Buffer | Blob | string) to a string. */
-function contentsToString(c: Buffer | Blob | string): string {
-  if (typeof c === "string") return c;
-  if (Buffer.isBuffer(c)) return c.toString("utf-8");
-  // A Blob (or anything else) — best-effort string coercion; the service
-  // returns string/Buffer in practice, so this branch is a defensive fallback.
-  return String(c);
+/**
+ * Fetch decrypted chunk contents for the given ids straight from the
+ * cyborgdb-service REST API (`POST /v1/vectors/get`), returning an id→text map.
+ *
+ * We deliberately bypass the SDK's `index.get()`: in text-in mode (KTD3) chunk
+ * `contents` are stored as plain UTF-8 strings (the service embeds them), but
+ * the SDK's get() unconditionally base64-decodes the returned contents — which
+ * turns plain-text strings into mojibake (only the binary-upsert path stores
+ * base64). The REST endpoint returns the stored plaintext intact. Best-effort:
+ * returns an empty map on any failure, so callers fall back to metadata.snippet.
+ */
+async function fetchContents(
+  space: SpaceRef,
+  ids: string[],
+): Promise<Map<string, string>> {
+  const byId = new Map<string, string>();
+  if (ids.length === 0 || !space.indexKey) return byId;
+  try {
+    const res = await fetch(`${config.cyborgdbUrl}/v1/vectors/get`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        index_name: space.slug,
+        index_key: space.indexKey, // hex, as stored on Space.indexKey
+        ids,
+        include: ["contents"],
+      }),
+    });
+    if (!res.ok) return byId;
+    const data = (await res.json()) as {
+      results?: { id: string; contents?: unknown }[];
+    };
+    for (const item of data.results ?? []) {
+      if (typeof item.contents === "string" && item.contents.length > 0) {
+        byId.set(item.id, item.contents);
+      }
+    }
+  } catch {
+    // Network/parse failure — leave the map empty; callers fall back to snippet.
+  }
+  return byId;
 }
 
 /**
