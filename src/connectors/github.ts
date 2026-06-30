@@ -249,11 +249,16 @@ function scopeAdvisory(scopesHeader: string | null): string | undefined {
 // --- Connector implementation ----------------------------------------------
 
 function asCreds(creds: unknown): GitHubCreds {
-  const c = creds as Partial<GitHubCreds> | null | undefined;
-  if (!c || typeof c.token !== "string" || c.token.length === 0) {
+  // Credentials are persisted as a raw token string (R14 / routes.ts), but may
+  // also arrive as a { token } object (e.g. unit tests). Accept either shape.
+  const token =
+    typeof creds === "string"
+      ? creds
+      : (creds as Partial<GitHubCreds> | null | undefined)?.token;
+  if (typeof token !== "string" || token.length === 0) {
     throw new Error("GitHub credentials require a non-empty `token`.");
   }
-  return { token: c.token };
+  return { token };
 }
 
 async function validate(creds: unknown): Promise<ValidationResult> {

@@ -68,7 +68,12 @@ interface SlackUser {
 }
 
 function asCreds(creds: unknown): SlackCreds {
-  const token = (creds as { token?: unknown } | null)?.token;
+  // Credentials are persisted as a raw token string (R14 / routes.ts), but may
+  // also arrive as a { token } object (e.g. unit tests). Accept either shape.
+  const token =
+    typeof creds === "string"
+      ? creds
+      : (creds as { token?: unknown } | null)?.token;
   if (typeof token !== "string" || token.length === 0) {
     throw new SlackError("Missing Slack bot token.", "no_token");
   }

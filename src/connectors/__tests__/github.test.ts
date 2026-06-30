@@ -72,6 +72,21 @@ describe("githubConnector.validate", () => {
     expect(r.ok).toBe(true);
     expect(r.scopeWarning).toBeUndefined();
   });
+
+  it("accepts a raw token string (the shape the API layer stores/passes)", async () => {
+    vi.stubGlobal("fetch", mockFetch());
+    handlers = [
+      (u) => (u.endsWith("/user") ? { status: 200, headers: { "x-oauth-scopes": "repo" }, body: { login: "x" } } : null!),
+    ];
+    const r = await githubConnector.validate("ghp_test");
+    expect(r.ok).toBe(true);
+  });
+
+  it("returns ok:false (not a throw) on an empty credential", async () => {
+    const r = await githubConnector.validate("");
+    expect(r.ok).toBe(false);
+    expect(r.message).toMatch(/non-empty|token/i);
+  });
 });
 
 describe("githubConnector.sync", () => {
