@@ -306,13 +306,31 @@ async function listTargets(creds: unknown): Promise<ConnectorTarget[]> {
   }));
 }
 
+interface RepoTarget {
+  owner: string;
+  repo: string;
+  // Explicit ref from a /tree/<branch>/… or /blob/<branch>/… URL; when unset the
+  // caller falls back to the repo's default branch.
+  branch?: string;
+  // Path prefix to scope ingestion to (no leading/trailing slash). When set,
+  // only files at or under this path are ingested. Undefined = whole repo.
+  subpath?: string;
+}
+
 /**
- * Resolve a repo target to its owner + repo. Accepts the canonical "owner/repo"
- * but also tolerates a pasted URL — "https://github.com/owner/repo(.git)",
- * "github.com/owner/repo", or "git@github.com:owner/repo" — so a copied browser
- * URL just works. Throws if it can't find both an owner and a repo.
+ * Resolve a repo target to owner + repo, plus an optional branch + subpath when
+ * a deep URL is given. Accepts:
+ *   - "owner/repo"
+ *   - "https://github.com/owner/repo(.git)" / "github.com/owner/repo"
+ *   - "git@github.com:owner/repo"
+ *   - "github.com/owner/repo/tree/<branch>/<folder…>"  → scope to that folder
+ *   - "github.com/owner/repo/blob/<branch>/<file>"     → scope to that file
+ * A `/tree|/blob/<branch>/<path>` URL scopes ingestion to <path> on <branch>;
+ * a plain owner/repo ingests the whole default branch. Branch is taken as the
+ * single segment after tree/blob (refs containing slashes are not disambiguated
+ * without an API call — out of scope). Throws if owner or repo is missing.
  */
-function splitRepoId(repoId: string): { owner: string; repo: string } {
+function parseRepoTarget(repoId: string): RepoTarget {
   const normalized = repoId
     .trim()
     .replace(/^https?:\/\//i, "")
@@ -320,9 +338,13 @@ function splitRepoId(repoId: string): { owner: string; repo: string } {
     .replace(/^(www\.)?github\.com\//i, "")
     .replace(/\.git$/i, "")
     .replace(/\/+$/, "");
-  const [owner, repo] = normalized.split("/").filter(Boolean);
+  const [owner, repo, kind, branch, ...rest] = normalized.split("/").filter(Boolean);
   if (!owner || !repo) {
     throw new Error(`Malformed repo id "${repoId}" (expected "owner/repo").`);
+  }
+  if ((kind === "tree" || kind === "blob") && branch) {
+    const subpath = rest.join("/") || undefined;
+    return { owner, repo, branch, subpath };
   }
   return { owner, repo };
 }
@@ -336,10 +358,17 @@ async function getRepo(token: string, owner: string, repo: string): Promise<GhRe
   return (await res.json()) as GhRepo;
 }
 
+/** Whether a tree path is within the requested subpath scope (folder or file). */
+function inSubpath(path: string, subpath: string | undefined): boolean {
+  if (!subpath) return true; // whole repo
+  return path === subpath || path.startsWith(`${subpath}/`);
+}
+
 /**
- * Stream Chunks for one repo's files (R12). Walks the default-branch tree
- * recursively, skips binaries / vendored dirs / oversize blobs, fetches blob
- * contents for the rest, and chunks each file's text with chunkText.
+ * Stream Chunks for one repo's files (R12). Walks the given branch's tree
+ * recursively, skips binaries / vendored dirs / oversize blobs and (when
+ * `subpath` is set) anything outside that folder/file, fetches blob contents for
+ * the rest, and chunks each file's text with chunkText.
  */
 async function* syncRepoFiles(
   token: string,
@@ -347,6 +376,7 @@ async function* syncRepoFiles(
   owner: string,
   repo: string,
   branch: string,
+  subpath?: string,
 ): AsyncGenerator<Chunk> {
   const treeRes = await ghFetch(
     token,
@@ -363,6 +393,7 @@ async function* syncRepoFiles(
 
   for (const entry of tree.tree) {
     if (entry.type !== "blob") continue;
+    if (!inSubpath(entry.path, subpath)) continue;
     if (!isTextFile(entry.path)) continue;
     if (typeof entry.size === "number" && entry.size > MAX_FILE_BYTES) continue;
 
@@ -470,12 +501,14 @@ async function* sync(creds: unknown, repoIds: string[]): AsyncIterable<Chunk> {
 
   for (const repoId of repoIds) {
     try {
-      const { owner, repo } = splitRepoId(repoId);
+      const { owner, repo, branch: refOverride, subpath } = parseRepoTarget(repoId);
       const meta = await getRepo(token, owner, repo);
-      const branch = meta.default_branch || "main";
+      const branch = refOverride || meta.default_branch || "main";
 
-      yield* syncRepoFiles(token, repoId, owner, repo, branch);
-      yield* syncRepoIssues(token, repoId, owner, repo);
+      yield* syncRepoFiles(token, repoId, owner, repo, branch, subpath);
+      // Issues are repo-wide, not folder-scoped: when the target narrows to a
+      // subpath the intent is "just these docs", so we skip issues entirely.
+      if (!subpath) yield* syncRepoIssues(token, repoId, owner, repo);
       succeeded += 1;
     } catch (e) {
       const err = e instanceof Error ? e : new Error(String(e));

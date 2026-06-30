@@ -167,6 +167,48 @@ describe("githubConnector.sync", () => {
     expect(chunks.map((c) => c.metadata.ref)).toContain("README.md");
   });
 
+  it("scopes ingestion to the folder in a /tree/<branch>/<path> URL and skips issues", async () => {
+    vi.stubGlobal("fetch", mockFetch());
+    let issuesCalled = false;
+    let treeBranch = "";
+    handlers = [
+      (u) => (/\/repos\/me\/repo$/.test(u) ? { body: { full_name: "me/repo", default_branch: "main" } } : null!),
+      (u) => {
+        const m = u.match(/\/git\/trees\/([^?]+)/);
+        if (!m) return null!;
+        treeBranch = decodeURIComponent(m[1]);
+        return {
+          body: repoTree([
+            { path: "versions/v0.17/upsert.md" },
+            { path: "versions/v0.16/upsert.md" },
+            { path: "README.md" },
+          ]),
+        };
+      },
+      (u) =>
+        u.includes("/git/blobs/")
+          ? { body: { content: Buffer.from("body").toString("base64"), encoding: "base64" } }
+          : null!,
+      (u) => {
+        if (!u.includes("/issues?state=all")) return null!;
+        issuesCalled = true;
+        return { body: [] };
+      },
+    ];
+
+    const chunks = await collect(
+      githubConnector.sync(TOKEN, ["https://github.com/me/repo/tree/dev/versions/v0.17"]),
+    );
+    const refs = chunks.map((c) => c.metadata.ref);
+    // Only the v0.17 folder is ingested; v0.16 and the root README are excluded.
+    expect(refs).toContain("versions/v0.17/upsert.md");
+    expect(refs.some((r) => String(r).includes("v0.16"))).toBe(false);
+    expect(refs).not.toContain("README.md");
+    // Branch from the URL is used, and repo-wide issues are skipped when scoped.
+    expect(treeBranch).toBe("dev");
+    expect(issuesCalled).toBe(false);
+  });
+
   it("retries on 429 then succeeds", async () => {
     vi.stubGlobal("fetch", mockFetch());
     let userHits = 0;

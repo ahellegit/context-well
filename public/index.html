@@ -842,7 +842,7 @@ class Component extends DCLogic {
     ];
     // Connector kinds the backend registers (github, slack). gdoc/files are deferred.
     this.KINDS = [
-      { id:'github', label:'GitHub', credPlaceholder:'GitHub personal access token (contents:read, issues:read)', targetPlaceholder:'Repos to ingest: owner/repo, comma-separated (e.g. facebook/react)' },
+      { id:'github', label:'GitHub', credPlaceholder:'GitHub personal access token (contents:read, issues:read)', targetPlaceholder:'owner/repo, or a /tree/<branch>/<folder> URL to scope to a folder (comma-separated)' },
       { id:'slack', label:'Slack', credPlaceholder:'Slack bot token (channels:history, channels:read, users:read)', targetPlaceholder:'Channel IDs to ingest, comma-separated (e.g. C012AB3CD)' },
     ];
     // status enum → display + color
