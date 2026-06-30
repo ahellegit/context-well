@@ -8,6 +8,7 @@
 import type { FastifyInstance } from "fastify";
 import { getSettings, updateSettings, isConfigured } from "./service.js";
 import { testConnection } from "../ollama/client.js";
+import { requireWorkspaceRole } from "../auth/space-guard.js";
 
 interface UpdateBody {
   ollamaUrl?: unknown;
@@ -28,8 +29,11 @@ export default async function settingsRoutes(app: FastifyInstance): Promise<void
     return { ...settings, isConfigured: configured };
   });
 
-  // Persist the Ollama URL and/or chat model.
-  app.put("/api/settings", async (request, reply) => {
+  // Persist the Ollama URL and/or chat model. Admin/owner only — this is a
+  // workspace-global setting and the orchestrator sends every user's chat turn
+  // (prompt + retrieved source content) to the configured URL, so a low-privilege
+  // user must not be able to repoint it.
+  app.put("/api/settings", { preHandler: requireWorkspaceRole("admin") }, async (request, reply) => {
     const body = (request.body ?? {}) as UpdateBody;
 
     const patch: { ollamaUrl?: string; chatModel?: string } = {};
@@ -52,7 +56,8 @@ export default async function settingsRoutes(app: FastifyInstance): Promise<void
   });
 
   // Test reachability + discover chat models (SSRF-guarded in the client).
-  app.post("/api/settings/test-ollama", async (request, reply) => {
+  // Admin/owner only — server-side fetch to a caller-supplied URL.
+  app.post("/api/settings/test-ollama", { preHandler: requireWorkspaceRole("admin") }, async (request, reply) => {
     const body = (request.body ?? {}) as TestBody;
     if (typeof body.url !== "string" || body.url.trim().length === 0) {
       return reply.code(400).send({ error: "A url string is required." });
