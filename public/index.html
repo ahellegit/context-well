@@ -1536,7 +1536,15 @@ class Component extends DCLogic {
     const sid=this.state.spaceId;
     this.setState({ syncingSpaces: { ...this.state.syncingSpaces, [sid]: true } });
     await this.reloadConnectors();
-    const r = await this.apiJson('/api/connectors/'+id+'/sync', { method:'POST', body: JSON.stringify({}) });
+    // The sync POST blocks until the whole sync finishes, so poll the connector
+    // row meanwhile — the backend heartbeats live progress into its `detail`.
+    const poll = setInterval(()=>{ this.refreshConnectors(sid); }, 1500);
+    let r;
+    try {
+      r = await this.apiJson('/api/connectors/'+id+'/sync', { method:'POST', body: JSON.stringify({}) });
+    } finally {
+      clearInterval(poll);
+    }
     if (r.status===409) { this.flash('A sync is already in progress for this space.'); }
     else if (!r.ok) { this.flash('Sync failed.'); }
     else {
@@ -1546,6 +1554,13 @@ class Component extends DCLogic {
     const syncingSpaces = { ...this.state.syncingSpaces }; delete syncingSpaces[sid];
     this.setState({ syncingSpaces });
     await this.reloadConnectors();
+  }
+  // Lightweight connectors-only refresh used by the sync progress poller.
+  async refreshConnectors(sid){
+    const r = await this.apiJson('/api/spaces/'+sid+'/connectors');
+    if (r.ok && Array.isArray(r.body)) {
+      this.setState({ connectorsBySpace: { ...this.state.connectorsBySpace, [sid]: r.body } });
+    }
   }
   async removeConnector(id){
     const r = await this.api('/api/connectors/'+id, { method:'DELETE' });
@@ -1752,12 +1767,14 @@ class Component extends DCLogic {
       const st = this.STATUS[c.status] || this.STATUS.idle;
       let targetResults = [];
       let detailLine = '';
+      let progress = null;
       try {
         const parsed = c.detail ? JSON.parse(c.detail) : null;
         if (parsed && Array.isArray(parsed.targets)) {
           targetResults = parsed.targets.map(t=>({ targetId:t.targetId, color: t.ok?'#22c55e':'#f87171',
             detail: (t.ok?('synced '+t.chunks+' chunks'):('failed: '+(t.message||'error'))) }));
         }
+        if (parsed && parsed.progress) progress = parsed.progress;
       } catch(e) { detailLine = c.detail || ''; }
       const cnt = (c.chunkCount||0);
       const targets = Array.isArray(c.targets) ? c.targets : [];
@@ -1765,12 +1782,25 @@ class Component extends DCLogic {
       const summary = isUpload
         ? ((cnt? (cnt+' chunks'):'no files yet') + ' · uploaded text/markdown/code')
         : ((cnt? (cnt+' chunks'):'no chunks yet') + (targets.length? (' · '+targets.length+' target'+(targets.length===1?'':'s')) : '') + (c.credentials && c.credentials.set ? (' · token ••'+(c.credentials.last4||'')) : ' · no token'));
-      const syncDisabled = isSyncing || c.status==='syncing';
+      // While syncing, show the live heartbeat in place of the static summary.
+      let progressLine = '';
+      if (progress) {
+        if (progress.phase==='pulling') {
+          progressLine = 'Pulling… '+(progress.chunks||0)+' chunks'
+            + (progress.target ? (' · '+progress.target+((progress.targetTotal>1)?(' ('+(progress.targetIndex||'?')+'/'+progress.targetTotal+')'):'')) : '');
+        } else if (progress.phase==='embedding') {
+          progressLine = 'Embedding '+(progress.chunks||0)+' chunks…';
+        } else if (progress.phase==='finishing') {
+          progressLine = 'Finishing up…';
+        }
+      }
+      const syncing = c.status==='syncing';
+      const syncDisabled = isSyncing || syncing;
       return {
         id:c.id, name: c.kind==='github'?'GitHub':(c.kind==='slack'?'Slack':(isUpload?'Uploaded files':c.kind)),
         isGithub:c.kind==='github', isSlack:c.kind==='slack', isUpload,
         hasActions: !isUpload,
-        detail: summary, statusLabel: st.label, color: st.color,
+        detail: (syncing && progressLine) ? progressLine : summary, statusLabel: st.label, color: st.color,
         showPartial: c.status==='partial' && targetResults.length>0,
         targetResults,
         validate:()=>this.validateConnector(c.id),
