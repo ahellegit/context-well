@@ -255,6 +255,42 @@ describe("slackConnector.sync", () => {
     // No replies were fetched for the standalone message.
   });
 
+  it("resolves a channel name (not an ID) to its ID via conversations.list", async () => {
+    on("conversations.list", {
+      body: {
+        ok: true,
+        channels: [
+          { id: "C9", name: "engineering", is_member: true },
+          { id: "C8", name: "random", is_member: true },
+        ],
+        response_metadata: { next_cursor: "" },
+      },
+    });
+    on("conversations.history", {
+      body: {
+        ok: true,
+        messages: [{ type: "message", ts: "90.000", text: "Hello eng", user: "U1" }],
+        response_metadata: { next_cursor: "" },
+      },
+    });
+
+    const chunks = await collect(slackConnector.sync(CREDS, ["engineering"]));
+    expect(chunks).toHaveLength(1);
+    // The resolved channel ID (C9), not the name, flows into chunk metadata.
+    expect(chunks[0].metadata.channel).toBe("C9");
+  });
+
+  it("throws a clear error for a channel name that matches no public channel", async () => {
+    on("conversations.list", {
+      body: {
+        ok: true,
+        channels: [{ id: "C9", name: "engineering", is_member: true }],
+        response_metadata: { next_cursor: "" },
+      },
+    });
+    await expect(collect(slackConnector.sync(CREDS, ["nope"]))).rejects.toThrow(/not found/i);
+  });
+
   it("yields 0 chunks for a channel the bot is not a member of (no throw)", async () => {
     on("conversations.history", { body: { ok: false, error: "not_in_channel" } });
 

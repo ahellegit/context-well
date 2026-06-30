@@ -269,8 +269,14 @@ function noteForChannel(ch: SlackChannel): string | undefined {
  * nothing for that channel rather than throwing the whole sync (the orchestrator
  * records per-target results). Archived/empty channels naturally yield nothing.
  */
-async function* sync(creds: unknown, channelIds: string[]): AsyncIterable<Chunk> {
+async function* sync(creds: unknown, channelTargets: string[]): AsyncIterable<Chunk> {
   const { token } = asCreds(creds);
+
+  // Targets may be channel IDs (C…/G…/D…) or human names ("engineering" /
+  // "#engineering"); conversations.history needs IDs. Resolve names → IDs (only
+  // hitting conversations.list when a target isn't already an ID). An
+  // unresolvable name fails loudly rather than silently yielding nothing.
+  const channelIds = await resolveChannelTargets(token, channelTargets);
 
   // Resolve author names once (id → display name), cached across all channels.
   const userNames = await loadUserNames(token);
@@ -283,6 +289,48 @@ async function* sync(creds: unknown, channelIds: string[]): AsyncIterable<Chunk>
   for (const channelId of channelIds) {
     yield* syncChannel(token, channelId, nameFor);
   }
+}
+
+/** Whether a target already looks like a Slack channel/conversation ID. */
+function isChannelId(s: string): boolean {
+  return /^[CGD][A-Z0-9]+$/.test(s);
+}
+
+/**
+ * Resolve channel targets to IDs. IDs pass through untouched; names (with or
+ * without a leading `#`) are looked up case-insensitively against the public
+ * channel list. Throws a clear SlackError for a name that matches no public
+ * channel (so a typo / private channel surfaces instead of silent 0 chunks).
+ */
+async function resolveChannelTargets(
+  token: string,
+  targets: string[],
+): Promise<string[]> {
+  if (targets.every(isChannelId)) return targets;
+
+  const nameToId = new Map<string, string>();
+  let cursor: string | undefined;
+  do {
+    const { body } = await slackCall<SlackResponse & { channels?: SlackChannel[] }>(
+      token,
+      "conversations.list",
+      { types: "public_channel", exclude_archived: "false", limit: 200, cursor },
+    );
+    for (const ch of body.channels ?? []) nameToId.set(ch.name.toLowerCase(), ch.id);
+    cursor = body.response_metadata?.next_cursor || undefined;
+  } while (cursor);
+
+  return targets.map((t) => {
+    if (isChannelId(t)) return t;
+    const id = nameToId.get(t.replace(/^#/, "").toLowerCase());
+    if (!id) {
+      throw new SlackError(
+        `Slack channel "${t}" not found. Use the channel name (e.g. "engineering") or its ID, and make sure it's a public channel the bot can see.`,
+        "channel_not_found",
+      );
+    }
+    return id;
+  });
 }
 
 /** Sync one channel; swallows per-channel read failures (yields nothing). */
