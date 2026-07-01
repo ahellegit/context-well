@@ -27,7 +27,8 @@
     "@prisma/client": "^6.2.1",
     "argon2": "^0.41.1",
     "cyborgdb": "^0.17.0",
-    "fastify": "^5.2.1"
+    "fastify": "^5.2.1",
+    "prisma-field-encryption": "^1.6.0"
   },
   "devDependencies": {
     "@types/node": "^22.10.5",
