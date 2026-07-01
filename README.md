@@ -44,10 +44,19 @@ docker compose down -v         # stop and delete all data (fresh start)
 docker compose up -d --build   # rebuild after pulling code changes
 ```
 
-## Optional configuration
+## Configuration
 
-Everything works out of the box. Create a `.env` (copy `.env.example`) **only**
-to override a default — for example:
+One variable is **required**: `PRISMA_FIELD_ENCRYPTION_KEY`, the master key for
+at-rest encryption (see [Security](#security-encryption-at-rest)). The app
+refuses to boot without it. Generate one and put it in `.env`:
+
+```bash
+npx cloak generate            # → k1.aesgcm256.<base64>
+echo "PRISMA_FIELD_ENCRYPTION_KEY=k1.aesgcm256..." >> .env
+```
+
+Everything else has a working default. Create a `.env` (copy `.env.example`) to
+override one — for example:
 
 - `SESSION_SECRET` — a random one is generated and persisted automatically; set
   this to pin it explicitly (e.g. to share sessions across replicas).
@@ -70,3 +79,42 @@ npm run dev                    # http://localhost:3000
 Requires a reachable `cyborgdb-service` (`CYBORGDB_URL`, default
 `http://localhost:8000`) and Ollama. In this mode local Ollama is
 `http://localhost:11434`.
+
+## Security: encryption at rest
+
+Context Well encrypts sensitive data at rest at the application layer, so a
+stolen database file or disk snapshot is useless without the master key.
+
+**Threat model.** Protects against an actor with a copy of the data — a lost
+volume, a leaked backup, a raw `app.db` dump, or filesystem/cloud-provider
+access. It does not defend against an attacker with live access to the running
+process's memory (a server must decrypt to serve queries).
+
+**What is encrypted** (AES-256-GCM via
+[`prisma-field-encryption`](https://github.com/47ng/prisma-field-encryption)):
+chat messages and cited snippets, connector credentials (GitHub/Slack tokens),
+conversation/document titles, document metadata, space custom prompts, and — 
+critically — the per-space **CyborgDB index keys**, so the encrypted embeddings
+can't be decrypted from a DB dump. Vector embeddings themselves are already
+encrypted at rest by CyborgDB.
+
+**The master key.** Set `PRISMA_FIELD_ENCRYPTION_KEY` (format
+`k1.aesgcm256.<base64>`, via `npx cloak generate`). It is validated at boot and
+is **required** — the app will not start without it. It is injected from the
+environment and deliberately never generated onto or stored on the data volume;
+that is why `docker compose up` is not zero-config for this one value. **Back the
+key up** — losing it makes encrypted data unrecoverable.
+
+**Rotation.** Set a new key in `PRISMA_FIELD_ENCRYPTION_KEY`, move the old key
+into `PRISMA_FIELD_DECRYPTION_KEYS` (comma-separated) so existing data still
+decrypts, then re-encrypt with `npx tsx scripts/backfill-encryption.ts`.
+
+**Enabling on an existing database.** Deploy the new build, then run
+`npx tsx scripts/backfill-encryption.ts` once to encrypt pre-existing rows. Order
+doesn't matter: legacy plaintext rows are read through transparently until
+re-encrypted.
+
+**Residual (disk-encryption only).** `User.email` (a unique login-lookup key, so
+it can't use randomized encryption) and `Session.id` (short-lived; the cookie is
+already signed) are not app-encrypted. Run the deployment on an encrypted volume
+to cover them.

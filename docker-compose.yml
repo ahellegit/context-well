@@ -10,9 +10,11 @@ name: context-well-rag
 services:
   app:
     build: .
-    # .env is optional: a from-scratch user can `docker compose up` with no .env
-    # and configure everything from the UI. Provide a .env only to override the
-    # defaults below (e.g. a custom SESSION_SECRET or a remote Ollama URL).
+    # Provide a .env to override the defaults below (e.g. a custom SESSION_SECRET
+    # or a remote Ollama URL). It must supply PRISMA_FIELD_ENCRYPTION_KEY — the
+    # at-rest encryption master key is required and deliberately NOT generated for
+    # you (a key auto-persisted onto app_data would sit next to the DB it protects,
+    # defeating encryption at rest). Generate one with `npx cloak generate`.
     env_file:
       - path: .env
         required: false
@@ -20,6 +22,9 @@ services:
       # Reach cyborgdb-service over the compose network, not localhost.
       CYBORGDB_URL: http://cyborgdb-service:8000
       DATABASE_URL: file:/data/app.db
+      # Required. Injected from the host env or .env; kept off the app_data volume
+      # on purpose. Compose fails fast with this message if it is unset.
+      PRISMA_FIELD_ENCRYPTION_KEY: "${PRISMA_FIELD_ENCRYPTION_KEY:?set it in .env, generate with npx cloak generate}"
       # Pre-fills the setup wizard's Ollama field. host.docker.internal is mapped
       # via extra_hosts below; the app's SSRF guard allows this hostname (it
       # blocks private IP literals). Override in .env to point elsewhere.

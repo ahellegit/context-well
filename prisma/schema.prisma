@@ -82,9 +82,11 @@ model Space {
   id                  String         @id @default(cuid())
   slug                String         @unique
   name                String
-  customPrompt        String         @default("")
-  // 32-byte CyborgDB index key, hex-encoded (KTD4). v1 stores it unencrypted (KTD5).
-  indexKey            String
+  customPrompt        String         @default("") /// @encrypted — may hold sensitive business context (R1)
+  // 32-byte CyborgDB index key, hex-encoded (KTD4). Encrypted at rest (R2): a
+  // stolen app.db no longer yields the key that decrypts the embeddings. Read
+  // via prisma it decrypts to hex, which hexToKey() feeds to the SDK unchanged.
+  indexKey            String         /// @encrypted
   embeddingModel      String         @default("all-MiniLM-L6-v2")
   similarityThreshold Float          @default(0.35)
   createdAt           DateTime       @default(now())
@@ -99,7 +101,7 @@ model Connector {
   spaceId     String
   space       Space      @relation(fields: [spaceId], references: [id], onDelete: Cascade)
   kind        String // "github" | "slack"
-  credentials String // token(s); v1 plaintext, never returned to the browser (R29)
+  credentials String /// @encrypted — GitHub PAT / Slack token; encrypted at rest (R1), never returned to the browser (R29)
   targets     String     @default("[]") // JSON array of selected repos/channels
   status      String     @default("idle") // idle|validating|auth_error|syncing|connected|partial|error
   detail      String     @default("") // human summary / per-target results (JSON)
@@ -117,8 +119,8 @@ model Document {
   connectorId String
   connector   Connector        @relation(fields: [connectorId], references: [id], onDelete: Cascade)
   externalRef String // stable source ref (repo path, issue ref, channel+ts)
-  title       String
-  metadata    String           @default("{}") // JSON
+  title       String           /// @encrypted — document title, encrypted at rest (R1)
+  metadata    String           @default("{}") /// @encrypted — JSON, encrypted at rest (R1)
   vectors     DocumentVector[]
 
   @@index([spaceId])
@@ -144,7 +146,7 @@ model Conversation {
   // backfill existing rows; new conversations always set it.
   userId    String?
   user      User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  title     String    @default("New chat")
+  title     String    @default("New chat") /// @encrypted — often derived from the first message (R1)
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   messages  Message[]
@@ -158,9 +160,9 @@ model Message {
   conversationId String
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   role           String // "user" | "assistant"
-  text           String
+  text           String       /// @encrypted — chat message content, encrypted at rest (R1)
   // Full snapshot of cited source cards (R30): [{id,title,snippet,score,connector}]
-  sources        String       @default("[]")
+  sources        String       @default("[]") /// @encrypted — cited snippets, encrypted at rest (R1)
   createdAt      DateTime     @default(now())
 
   @@index([conversationId])

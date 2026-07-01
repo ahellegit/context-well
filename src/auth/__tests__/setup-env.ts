@@ -15,6 +15,10 @@ const dbFile = join(dir, "test.db");
 process.env.DATABASE_URL = `file:${dbFile}`;
 process.env.SESSION_SECRET ??= "test-session-secret-test-session-secret-0123456789";
 process.env.CYBORGDB_URL ??= "http://localhost:8000";
+// A valid cloak test key so config validation passes and field encryption is
+// exercised end-to-end in the suite (not a real secret).
+process.env.PRISMA_FIELD_ENCRYPTION_KEY ??=
+  "k1.aesgcm256.NvVoW1CM4cGEKF4NZhaDU1ieyzu7UVJ1v75WYhdmyag=";
 process.env.COOKIE_SECURE = "false";
 process.env.ALLOW_REGISTRATION = "false";
 

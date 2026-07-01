@@ -182,8 +182,14 @@ export async function listDocuments(spaceId: string): Promise<SpaceDocument[]> {
       connector: { select: { kind: true } },
       _count: { select: { vectors: true } },
     },
-    orderBy: [{ connectorId: "asc" }, { title: "asc" }],
   });
+  // `title` is encrypted at rest, so a DB-level ORDER BY title sorts ciphertext
+  // (a no-op the extension warns about). Sort in-app on the decrypted values to
+  // preserve the "grouped by connector, titled A→Z" ordering.
+  docs.sort(
+    (a, b) =>
+      a.connectorId.localeCompare(b.connectorId) || a.title.localeCompare(b.title),
+  );
   return docs.map((d) => ({
     id: d.id,
     title: d.title,
