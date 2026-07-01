@@ -83,8 +83,10 @@ model Space {
   slug                String         @unique
   name                String
   customPrompt        String         @default("") /// @encrypted — may hold sensitive business context (R1)
-  // 32-byte CyborgDB index key, hex-encoded (KTD4). v1 stores it unencrypted (KTD5).
-  indexKey            String
+  // 32-byte CyborgDB index key, hex-encoded (KTD4). Encrypted at rest (R2): a
+  // stolen app.db no longer yields the key that decrypts the embeddings. Read
+  // via prisma it decrypts to hex, which hexToKey() feeds to the SDK unchanged.
+  indexKey            String         /// @encrypted
   embeddingModel      String         @default("all-MiniLM-L6-v2")
   similarityThreshold Float          @default(0.35)
   createdAt           DateTime       @default(now())
