@@ -26,6 +26,31 @@ function optional(name: string, fallback: string): string {
   return v && v.length > 0 ? v : fallback;
 }
 
+// The at-rest encryption master key (KEK). Encrypts sensitive columns via
+// prisma-field-encryption; a stolen app.db is useless without it. Unlike the
+// session secret, we NEVER auto-generate or persist it next to the DB — that
+// would defeat the untrusted-host threat model — so a missing/malformed key is
+// a hard boot failure. Format is cloak's: `k1.aesgcm256.<base64 of 32 bytes>`.
+// Generate with `npx cloak generate`. Validated here so boot fails loudly
+// before the extension would lazily error on the first write.
+function validateEncryptionKey(name: string): string {
+  const raw = required(name);
+  const match = raw.match(/^k1\.aesgcm256\.(.+)$/);
+  if (!match) {
+    throw new Error(
+      `${name} must be a cloak key of the form "k1.aesgcm256.<base64>". ` +
+        `Generate one with: npx cloak generate`,
+    );
+  }
+  const bytes = Buffer.from(match[1], "base64");
+  if (bytes.length !== 32) {
+    throw new Error(
+      `${name} must encode a 32-byte AES-256 key, got ${bytes.length} bytes.`,
+    );
+  }
+  return raw;
+}
+
 // Zero-config session secret: when SESSION_SECRET is not provided, generate a
 // random one once and persist it alongside the database so it survives restarts
 // (a fresh secret every boot would invalidate all sessions). Setting an explicit
@@ -69,6 +94,7 @@ export interface Config {
   databaseUrl: string;
   cyborgdbUrl: string;
   ollamaDefaultUrl: string;
+  encryptionKey: string;
 }
 
 // Note: open self-registration was removed with app-layer RBAC — accounts are
@@ -83,6 +109,7 @@ export function loadConfig(): Config {
     databaseUrl,
     cyborgdbUrl: required("CYBORGDB_URL"),
     ollamaDefaultUrl: optional("OLLAMA_DEFAULT_URL", ""),
+    encryptionKey: validateEncryptionKey("PRISMA_FIELD_ENCRYPTION_KEY"),
   };
 }
 
