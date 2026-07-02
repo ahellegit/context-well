@@ -1,0 +1,2072 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Context Well</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  html, body { height:100%; margin:0; background:#05090d; }
+  body { font-family:"Geist",-apple-system,sans-serif; color:#e8eef5; -webkit-font-smoothing:antialiased; }
+  * { box-sizing:border-box; }
+  ::selection { background:#e0454a; color:#fff; }
+  ::-webkit-scrollbar { width:9px; height:9px; }
+  ::-webkit-scrollbar-thumb { background:#1a2532; border-radius:6px; }
+  ::-webkit-scrollbar-thumb:hover { background:#38495c; }
+  @keyframes kl-blink { 50% { opacity:0; } }
+  @keyframes kl-bounce { 0%,80%,100% { transform:translateY(0); opacity:0.4; } 40% { transform:translateY(-4px); opacity:1; } }
+  @keyframes kl-shimmer { 0% { background-position:-200px 0; } 100% { background-position:200px 0; } }
+  .kl-skel { background:linear-gradient(90deg,#0e1620 0px,#16202c 80px,#0e1620 160px); background-size:200px 100%; animation:kl-shimmer 1.1s linear infinite; }
+  .kl-space-row .kl-space-del { opacity:0; transition:opacity 0.12s ease; }
+  .kl-space-row:hover .kl-space-del { opacity:1; }
+  .kl-space-del:hover { background:rgba(224,69,74,0.16) !important; color:#e0454a !important; }
+  .kl-subnav { overflow:hidden; max-height:0; opacity:0; transform:translateY(-2px); pointer-events:none;
+    transition:max-height .26s cubic-bezier(.4,0,.2,1), opacity .18s ease, transform .26s cubic-bezier(.4,0,.2,1); }
+  .kl-subnav.open { max-height:160px; opacity:1; transform:translateY(0); pointer-events:auto; }
+  .kl-subnav button:hover { background:rgba(224,69,74,0.07); }
+  @keyframes kl-fade-in { from { opacity:0; transform:translateY(3px); } to { opacity:1; transform:translateY(0); } }
+  .kl-switch-fade { animation:kl-fade-in .24s cubic-bezier(.4,0,.2,1); }
+</style>
+</helmet>
+
+<!-- ========= AUTH / SETUP FLOW ========= -->
+<sc-if value="{{ isAuth }}" hint-placeholder-val="{{ true }}">
+  <div style="height:100vh; width:100%; overflow:hidden; display:grid; grid-template-columns:1fr 1fr; background:#05090d;">
+    <!-- left brand panel -->
+    <div style="position:relative; overflow:hidden; border-right:1px solid #1f2c3b; background:radial-gradient(620px 420px at 32% 28%, rgba(224,69,74,0.10), transparent 62%), #070a0e; display:flex; flex-direction:column; justify-content:space-between; padding:40px;">
+      <div style="display:flex; align-items:center; gap:11px;">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none"><circle cx="6" cy="12" r="2.4" fill="#e0454a"/><circle cx="17" cy="6" r="2.4" fill="none" stroke="#e0454a" stroke-width="1.6"/><circle cx="17" cy="18" r="2.4" fill="none" stroke="#e0454a" stroke-width="1.6"/><path d="M8 11 15 7M8 13l7 4" stroke="#e0454a" stroke-width="1.4"/></svg>
+        <div><b style="font-size:15px;">Context Well</b><div style="font-size:9.5px; color:#768493; letter-spacing:0.12em; text-transform:uppercase; font-family:'Geist Mono',monospace;">vector workspace</div></div>
+      </div>
+      <!-- decorative graph (static) -->
+      <svg viewBox="0 0 440 360" style="position:absolute; inset:0; width:100%; height:100%; opacity:0.5;">
+        <g stroke="#1f2c3b" stroke-width="1.1" fill="none">
+          <line x1="220" y1="180" x2="120" y2="100"/><line x1="220" y1="180" x2="330" y2="110"/><line x1="220" y1="180" x2="130" y2="270"/><line x1="220" y1="180" x2="320" y2="260"/><line x1="120" y1="100" x2="60" y2="60"/><line x1="330" y1="110" x2="390" y2="70"/>
+        </g>
+        <g fill="#131c28" stroke="#38495c">
+          <circle cx="60" cy="60" r="5"/><circle cx="390" cy="70" r="5"/><circle cx="130" cy="270" r="6"/><circle cx="320" cy="260" r="6"/>
+        </g>
+        <circle cx="120" cy="100" r="9" fill="#e0454a"/>
+        <circle cx="330" cy="110" r="9" fill="#e0454a"/>
+        <circle cx="220" cy="180" r="13" fill="#0a1118" stroke="#e0454a" stroke-width="2"/>
+        <circle cx="220" cy="180" r="4" fill="#e0454a"/>
+      </svg>
+      <div style="position:relative; max-width:380px;">
+        <div style="font-size:26px; font-weight:600; line-height:1.25; letter-spacing:-0.01em;">Chat grounded in everything your team knows.</div>
+        <div style="font-size:13.5px; color:#768493; margin-top:14px; line-height:1.6;">Connect Slack, Google Docs, GitHub and files. Context Well indexes them into a private vector space and answers with citations — on the model you choose to run.</div>
+      </div>
+    </div>
+
+    <!-- right panel: login OR setup -->
+    <div style="overflow-y:auto; display:flex; flex-direction:column; min-height:0;">
+
+      <!-- LOGIN -->
+      <sc-if value="{{ isLogin }}" hint-placeholder-val="{{ true }}">
+        <div style="margin:auto; width:380px; max-width:88%; padding:48px 0;">
+          <h1 style="font-size:22px; font-weight:600; letter-spacing:-0.01em; margin:0;">{{ authTitle }}</h1>
+          <p style="font-size:13px; color:#768493; margin:8px 0 28px;">{{ authSubtitle }}</p>
+          <div style="display:flex; flex-direction:column; gap:12px;">
+            <label style="display:flex; flex-direction:column; gap:6px;"><span style="font-size:11.5px; color:#aebac8; font-weight:500;">Work email</span><input value="{{ email }}" onInput="{{ onEmail }}" onKeyDown="{{ onAuthKey }}" placeholder="you@team.dev" style="background:#0e1620; border:1px solid #2a3a4c; border-radius:9px; padding:11px 13px; color:#e8eef5; font:13.5px 'Geist'; outline:none;"></label>
+            <label style="display:flex; flex-direction:column; gap:6px;"><span style="font-size:11.5px; color:#aebac8; font-weight:500;">Password</span><input value="{{ password }}" onInput="{{ onPassword }}" onKeyDown="{{ onAuthKey }}" type="password" placeholder="••••••••••" style="background:#0e1620; border:1px solid #2a3a4c; border-radius:9px; padding:11px 13px; color:#e8eef5; font:13.5px 'Geist'; outline:none;"></label>
+          </div>
+          <sc-if value="{{ authError }}">
+            <div style="margin-top:12px; font-size:12px; color:#f87171; background:rgba(248,113,113,0.08); border:1px solid rgba(248,113,113,0.28); border-radius:8px; padding:9px 11px; line-height:1.5;">{{ authError }}</div>
+          </sc-if>
+          <button onClick="{{ submitAuth }}" style="{{ authBtnStyle }}">{{ authBtnLabel }}</button>
+        </div>
+      </sc-if>
+
+      <!-- FORCED FIRST-LOGIN PASSWORD CHANGE -->
+      <sc-if value="{{ isChangePw }}">
+        <div style="margin:auto; width:380px; max-width:88%; padding:48px 0;">
+          <h1 style="font-size:22px; font-weight:600; letter-spacing:-0.01em; margin:0;">Set a new password</h1>
+          <p style="font-size:13px; color:#768493; margin:8px 0 28px;">Your account was created with a temporary password. Choose a new one to continue.</p>
+          <div style="display:flex; flex-direction:column; gap:12px;">
+            <label style="display:flex; flex-direction:column; gap:6px;"><span style="font-size:11.5px; color:#aebac8; font-weight:500;">Temporary password</span><input value="{{ cpCurrent }}" onInput="{{ onCpCurrent }}" type="password" placeholder="••••••••••" style="background:#0e1620; border:1px solid #2a3a4c; border-radius:9px; padding:11px 13px; color:#e8eef5; font:13.5px 'Geist'; outline:none;"></label>
+            <label style="display:flex; flex-direction:column; gap:6px;"><span style="font-size:11.5px; color:#aebac8; font-weight:500;">New password</span><input value="{{ cpNew }}" onInput="{{ onCpNew }}" type="password" placeholder="at least 8 characters" style="background:#0e1620; border:1px solid #2a3a4c; border-radius:9px; padding:11px 13px; color:#e8eef5; font:13.5px 'Geist'; outline:none;"></label>
+            <label style="display:flex; flex-direction:column; gap:6px;"><span style="font-size:11.5px; color:#aebac8; font-weight:500;">Confirm new password</span><input value="{{ cpConfirm }}" onInput="{{ onCpConfirm }}" type="password" placeholder="re-enter new password" style="background:#0e1620; border:1px solid #2a3a4c; border-radius:9px; padding:11px 13px; color:#e8eef5; font:13.5px 'Geist'; outline:none;"></label>
+          </div>
+          <sc-if value="{{ cpError }}">
+            <div style="margin-top:12px; font-size:12px; color:#f87171; background:rgba(248,113,113,0.08); border:1px solid rgba(248,113,113,0.28); border-radius:8px; padding:9px 11px; line-height:1.5;">{{ cpError }}</div>
+          </sc-if>
+          <button onClick="{{ submitChangePassword }}" style="{{ cpBtnStyle }}">{{ cpBtnLabel }}</button>
+        </div>
+      </sc-if>
+
+      <!-- SETUP -->
+      <sc-if value="{{ isSetup }}">
+        <div style="margin:auto; width:440px; max-width:90%; padding:44px 0;">
+          <!-- step header -->
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px; font-family:'Geist Mono',monospace; font-size:11px; color:#768493;">
+            <span style="color:#e0454a;">SETUP</span><span>· step {{ setupStepNum }} of 2</span>
+          </div>
+          <div style="display:flex; gap:6px; margin-bottom:26px;">
+            <span style="height:3px; flex:1; border-radius:2px; background:{{ step1Bar }};"></span>
+            <span style="height:3px; flex:1; border-radius:2px; background:{{ step2Bar }};"></span>
+          </div>
+
+          <!-- STEP 1: provider -->
+          <sc-if value="{{ setupProviderStep }}" hint-placeholder-val="{{ true }}">
+            <h1 style="font-size:21px; font-weight:600; letter-spacing:-0.01em; margin:0;">Choose your model provider</h1>
+            <p style="font-size:13px; color:#768493; margin:8px 0 24px; line-height:1.55;">Your data and embeddings stay on the runtime you pick. Start local with Ollama — add hosted providers anytime.</p>
+            <div style="display:flex; flex-direction:column; gap:10px;">
+              <sc-for list="{{ providers }}" as="pv" hint-placeholder-count="4">
+                <button onClick="{{ pv.select }}" style="{{ pv.cardStyle }}">
+                  <span style="width:38px; height:38px; border-radius:9px; display:grid; place-items:center; flex:0 0 auto; background:{{ pv.iconBg }};">{{ pv.glyph }}</span>
+                  <div style="flex:1; min-width:0; text-align:left;">
+                    <div style="display:flex; align-items:center; gap:8px;"><b style="font-size:13.5px;">{{ pv.name }}</b><span style="{{ pv.tagStyle }}">{{ pv.tag }}</span></div>
+                    <div style="font-size:11.5px; color:#768493; margin-top:2px;">{{ pv.desc }}</div>
+                  </div>
+                  <sc-if value="{{ pv.selected }}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#e0454a" stroke-width="2.2" style="flex:0 0 auto;"><circle cx="12" cy="12" r="10" fill="rgba(224,69,74,0.12)"/><path d="m8 12 3 3 5-6"/></svg></sc-if>
+                </button>
+              </sc-for>
+            </div>
+            <button onClick="{{ providerNext }}" style="width:100%; margin-top:24px; background:#e0454a; color:#fff; border:0; border-radius:9px; padding:12px; font:600 13.5px 'Geist'; cursor:pointer;">Continue with {{ providerLabel }}</button>
+          </sc-if>
+
+          <!-- STEP 2: connect ollama -->
+          <sc-if value="{{ setupConnectStep }}">
+            <h1 style="font-size:21px; font-weight:600; letter-spacing:-0.01em; margin:0;">Connect Ollama</h1>
+            <p style="font-size:13px; color:#768493; margin:8px 0 22px; line-height:1.55;">Point Context Well at your Ollama server and choose the chat model used to answer. Embeddings for the vector index are handled by CyborgDB — no embedding model to pick here.</p>
+            <label style="display:flex; flex-direction:column; gap:6px;"><span style="font-size:11.5px; color:#aebac8; font-weight:500;">Ollama host</span>
+              <div style="display:flex; gap:8px;">
+                <input value="{{ ollamaHost }}" onInput="{{ onHost }}" style="flex:1; background:#0e1620; border:1px solid #2a3a4c; border-radius:9px; padding:11px 13px; color:#e8eef5; font:13px 'Geist Mono',monospace; outline:none;">
+                <button onClick="{{ testConn }}" disabled="{{ testDisabled }}" style="{{ testBtnStyle }}">{{ testBtnLabel }}</button>
+              </div>
+            </label>
+            <div style="margin-top:10px; min-height:22px;">
+              <sc-if value="{{ connTesting }}"><span style="font-size:11.5px; color:#768493; font-family:'Geist Mono',monospace; display:inline-flex; align-items:center; gap:7px;"><span style="width:6px;height:6px;border-radius:50%;background:#f59e0b;animation:kl-blink 1s infinite;"></span>reaching {{ ollamaHost }} …</span></sc-if>
+              <sc-if value="{{ connOk }}"><span style="font-size:11.5px; color:#22c55e; font-family:'Geist Mono',monospace; display:inline-flex; align-items:center; gap:7px;"><span style="width:6px;height:6px;border-radius:50%;background:#22c55e;"></span>{{ connOkLine }}</span></sc-if>
+              <sc-if value="{{ connNoModels }}"><span style="font-size:11.5px; color:#f59e0b; font-family:'Geist Mono',monospace; display:inline-flex; align-items:flex-start; gap:7px; line-height:1.5;"><span style="width:6px;height:6px;border-radius:50%;background:#f59e0b;margin-top:4px;flex:0 0 auto;"></span>{{ connMessage }}</span></sc-if>
+              <sc-if value="{{ connError }}"><span style="font-size:11.5px; color:#f87171; font-family:'Geist Mono',monospace; display:inline-flex; align-items:flex-start; gap:7px; line-height:1.5;"><span style="width:6px;height:6px;border-radius:50%;background:#f87171;margin-top:4px;flex:0 0 auto;"></span>{{ connMessage }}</span></sc-if>
+            </div>
+            <sc-if value="{{ showDockerHint }}">
+              <div style="margin-top:8px; font-size:11px; color:#768493; background:#0e1620; border:1px solid #1f2c3b; border-radius:8px; padding:9px 11px; line-height:1.55;">Running in Docker? <span style="color:#aebac8;font-family:'Geist Mono',monospace;">localhost</span> points at the container, not your host. Use <span style="color:#aebac8;font-family:'Geist Mono',monospace;">http://host.docker.internal:11434</span> or your machine's LAN IP.</div>
+            </sc-if>
+
+            <sc-if value="{{ connOk }}">
+              <div style="margin-top:18px;">
+                <div style="font-size:11.5px; color:#aebac8; font-weight:500; margin-bottom:9px;">Chat model</div>
+                <div style="display:flex; flex-direction:column; gap:7px;">
+                  <sc-for list="{{ chatModels }}" as="cm" hint-placeholder-count="3">
+                    <button onClick="{{ cm.select }}" style="{{ cm.style }}">
+                      <span style="flex:1; min-width:0; text-align:left;"><b style="font-size:12.5px; font-family:'Geist Mono',monospace;">{{ cm.id }}</b><sc-if value="{{ cm.flagged }}"><span style="font-size:9px; margin-left:8px; color:#f59e0b; border:1px solid rgba(245,158,11,0.3); background:rgba(245,158,11,0.1); border-radius:999px; padding:1px 7px; font-family:'Geist Mono',monospace;">maybe embedding</span></sc-if></span>
+                      <sc-if value="{{ cm.selected }}"><span style="width:7px;height:7px;border-radius:50%;background:#e0454a;flex:0 0 auto;"></span></sc-if>
+                    </button>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-if>
+
+            <div style="display:flex; gap:10px; margin-top:24px;">
+              <button onClick="{{ setupBack }}" style="background:#0e1620; border:1px solid #2a3a4c; border-radius:9px; padding:12px 16px; color:#aebac8; font:500 13px 'Geist'; cursor:pointer;">Back</button>
+              <button onClick="{{ finishSetup }}" disabled="{{ finishDisabled }}" style="{{ finishBtnStyle }}">Finish setup →</button>
+            </div>
+          </sc-if>
+        </div>
+      </sc-if>
+    </div>
+  </div>
+</sc-if>
+
+<!-- ========= MAIN APP ========= -->
+<sc-if value="{{ isApp }}">
+<div style="display:grid; grid-template-columns:236px 1fr; height:100vh; overflow:hidden; background:#05090d;">
+
+  <!-- ========= SIDEBAR ========= -->
+  <aside style="background:#0a1118; border-right:1px solid #1f2c3b; display:flex; flex-direction:column; min-height:0;">
+    <div style="padding:16px 16px 12px; display:flex; align-items:center; gap:10px;">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><circle cx="6" cy="12" r="2.4" fill="#e0454a"/><circle cx="17" cy="6" r="2.4" fill="none" stroke="#e0454a" stroke-width="1.6"/><circle cx="17" cy="18" r="2.4" fill="none" stroke="#e0454a" stroke-width="1.6"/><path d="M8 11 15 7M8 13l7 4" stroke="#e0454a" stroke-width="1.4"/></svg>
+      <div><b style="font-size:14px; letter-spacing:-0.01em;">Context Well</b><div style="font-size:9.5px; color:#768493; letter-spacing:0.12em; text-transform:uppercase; font-family:'Geist Mono',monospace;">vector workspace</div></div>
+    </div>
+    <div style="padding:0 12px 12px;">
+      <button onClick="{{ newChat }}" style="width:100%; display:flex; align-items:center; gap:8px; justify-content:center; background:#e0454a; color:#fff; border:0; border-radius:7px; padding:9px; font:500 13px 'Geist'; cursor:pointer;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>New chat</button>
+    </div>
+
+    <div style="padding:6px 12px 4px; display:flex; align-items:center;"><span style="font-size:10px; letter-spacing:0.1em; color:#4d5b6b; text-transform:uppercase; font-family:'Geist Mono',monospace;">Knowledge spaces</span><button onClick="{{ createSpace }}" title="New space" style="margin-left:auto; width:20px;height:20px;border-radius:5px;background:transparent;border:0;color:#768493;cursor:pointer;display:grid;place-items:center;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button></div>
+    <div style="padding:0 8px; display:flex; flex-direction:column; gap:1px;">
+      <sc-for list="{{ spaceList }}" as="sp" hint-placeholder-count="4">
+        <div>
+          <div onClick="{{ sp.select }}" class="kl-space-row" style="{{ sp.rowStyle }}">
+            <span style="{{ sp.dotStyle }}"></span>{{ sp.name }}<span style="{{ sp.countStyle }}">{{ sp.count }}</span><button onClick="{{ sp.del }}" class="kl-space-del" title="Delete space" style="{{ sp.delStyle }}"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M10 11v6M14 11v6"/></svg></button>
+          </div>
+          <div class="{{ sp.subnavClass }}">
+            <div style="margin:2px 0 5px 13px; padding-left:10px; border-left:1px solid #22303f; display:flex; flex-direction:column; gap:1px;">
+              <button onClick="{{ sp.goChat }}" style="{{ sp.chatStyle }}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="{{ sp.chatIcon }}" stroke-width="1.7"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Chats</button>
+              <button onClick="{{ sp.goSources }}" style="{{ sp.sourcesStyle }}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="{{ sp.sourcesIcon }}" stroke-width="1.7"><path d="m12 2 10 6-10 6L2 8z"/><path d="m2 17 10 6 10-6M2 12l10 6 10-6"/></svg>Sources<span style="{{ sp.srcCountStyle }}">{{ sp.sourceCount }}</span></button>
+              <sc-if value="{{ sp.showAccess }}">
+                <button onClick="{{ sp.goAccess }}" style="{{ sp.accessStyle }}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="{{ sp.accessIcon }}" stroke-width="1.7"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>Access</button>
+              </sc-if>
+            </div>
+          </div>
+        </div>
+      </sc-for>
+      <sc-if value="{{ noSpaces }}">
+        <div style="padding:14px 10px; text-align:center; color:#4d5b6b; font-size:12px; line-height:1.5;">No spaces yet.<br><span onClick="{{ createSpace }}" style="color:#e0454a;cursor:pointer;">Create your first space</span></div>
+      </sc-if>
+    </div>
+
+    <sc-if value="{{ canManageMembers }}">
+      <div style="margin-top:auto; padding:4px 8px 0;">
+        <button onClick="{{ goMembers }}" style="{{ navMembers.style }}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="{{ navMembers.icon }}" stroke-width="1.7"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>Members &amp; access</button>
+      </div>
+    </sc-if>
+
+    <div style="{{ userFooterStyle }}">
+      <span style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#fb7185,#f59e0b);display:grid;place-items:center;font-size:11px;font-weight:600;color:rgba(0,0,0,0.78);flex:0 0 auto;">{{ userInitials }}</span>
+      <div style="flex:1;min-width:0;"><b style="font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;">{{ userEmail }}</b><div style="font-size:10.5px;color:#768493;">{{ workspaceRoleLabel }}</div></div>
+      <button onClick="{{ logout }}" title="Sign out" style="width:26px;height:26px;border-radius:6px;background:transparent;border:0;color:#768493;cursor:pointer;display:grid;place-items:center;flex:0 0 auto;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg></button>
+    </div>
+  </aside>
+
+  <!-- ========= MAIN ========= -->
+  <main style="display:flex; flex-direction:column; min-width:0; min-height:0; background:#05090d;">
+
+    <!-- CHAT VIEW -->
+    <sc-if value="{{ isChat }}" hint-placeholder-val="{{ true }}">
+      <div class="kl-switch-fade" key="{{ spaceKey }}" style="display:grid; grid-template-columns:1fr 312px; min-height:0; flex:1;">
+        <!-- chat column -->
+        <div style="display:flex; flex-direction:column; min-width:0; min-height:0; border-right:1px solid #1f2c3b;">
+          <div style="height:54px; border-bottom:1px solid #1f2c3b; display:flex; align-items:center; gap:10px; padding:0 18px; flex:0 0 auto; position:relative;">
+            <span style="{{ headerDotStyle }}"></span>
+            <b style="font-size:13.5px;">{{ spaceName }}</b>
+            <span style="color:#2a3a4c; font-size:13px;">/</span>
+            <button onClick="{{ toggleConvMenu }}" style="display:inline-flex; align-items:center; gap:7px; background:{{ convMenuBg }}; border:1px solid {{ convMenuBorder }}; border-radius:7px; padding:5px 9px 5px 11px; cursor:pointer; max-width:320px;">
+              <span style="font-size:12.5px; color:#e8eef5; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ currentThreadTitle }}</span>
+              <span style="font-size:10px; color:#768493; font-family:'Geist Mono',monospace; flex:0 0 auto;">{{ currentThreadTime }}</span>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#768493" stroke-width="1.8" style="flex:0 0 auto; transform:{{ convChevron }};"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+            <sc-if value="{{ convMenuOpen }}">
+              <div onClick="{{ closeConvMenu }}" style="position:fixed; inset:0; z-index:40;"></div>
+              <div style="position:absolute; top:48px; left:118px; z-index:50; width:340px; max-height:380px; overflow-y:auto; background:#0a1118; border:1px solid #2a3a4c; border-radius:10px; box-shadow:0 18px 48px rgba(0,0,0,0.55); padding:6px;">
+                <button onClick="{{ newChat }}" style="width:100%; display:flex; align-items:center; gap:9px; background:transparent; border:0; border-radius:7px; padding:9px 10px; cursor:pointer; color:#e0454a; font:500 12.5px 'Geist'; text-align:left;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>New chat</button>
+                <div style="height:1px; background:#1f2c3b; margin:5px 8px;"></div>
+                <sc-if value="{{ showConvSearch }}">
+                  <div style="display:flex; align-items:center; gap:8px; background:#0e1620; border:1px solid #2a3a4c; border-radius:7px; padding:7px 10px; margin:2px 4px 6px;">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#768493" stroke-width="1.8" style="flex:0 0 auto;"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+                    <input value="{{ convSearch }}" onInput="{{ onConvSearch }}" placeholder="Search chats…" style="flex:1; min-width:0; background:transparent; border:0; outline:none; color:#e8eef5; font:12.5px 'Geist';">
+                  </div>
+                </sc-if>
+                <div style="padding:2px 10px 6px; font-size:9.5px; letter-spacing:0.1em; color:#4d5b6b; text-transform:uppercase; font-family:'Geist Mono',monospace;">{{ spaceName }} · history</div>
+                <sc-for list="{{ convList }}" as="cv" hint-placeholder-count="3">
+                  <button onClick="{{ cv.pick }}" style="{{ cv.menuStyle }}">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#768493" stroke-width="1.7" style="flex:0 0 auto;"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                    <span style="flex:1; min-width:0; font-size:12.5px; color:{{ cv.titleColor }}; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ cv.title }}</span>
+                    <span style="flex:0 0 auto; font-size:10px; color:#4d5b6b; font-family:'Geist Mono',monospace;">{{ cv.time }}</span>
+                  </button>
+                </sc-for>
+                <sc-if value="{{ hasConvMore }}">
+                  <div style="padding:8px 12px 6px; font-size:11px; color:#4d5b6b; font-family:'Geist Mono',monospace;">{{ convMoreHint }}</div>
+                </sc-if>
+                <sc-if value="{{ convNoResults }}">
+                  <div style="padding:14px 12px; font-size:12px; color:#4d5b6b; text-align:center;">No chats match that search.</div>
+                </sc-if>
+              </div>
+            </sc-if>
+            <div style="margin-left:auto; display:flex; align-items:center; gap:8px;">
+              <button onClick="{{ openPrompt }}" style="display:inline-flex;align-items:center;gap:6px;font-size:11px;color:#aebac8;background:#0e1620;border:1px solid #1f2c3b;border-radius:999px;padding:5px 10px;cursor:pointer;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#e0454a" stroke-width="1.8"><path d="m12 2 2.4 7.4H22l-6 4.6 2.3 7.4-6.3-4.6L5.7 21l2.3-7.4-6-4.6h7.6z"/></svg>Custom prompt</button>
+              <span style="display:inline-flex;align-items:center;gap:6px;font-size:11px;color:#aebac8;background:#0e1620;border:1px solid #1f2c3b;border-radius:999px;padding:5px 10px;font-family:'Geist Mono',monospace;white-space:nowrap;flex:0 0 auto;"><span style="width:6px;height:6px;border-radius:50%;background:#22c55e;flex:0 0 auto;"></span>{{ modelChip }}</span>
+            </div>
+          </div>
+
+          <sc-if value="{{ syncingBanner }}">
+            <div style="flex:0 0 auto; display:flex; align-items:center; gap:8px; padding:8px 26px; background:rgba(245,158,11,0.08); border-bottom:1px solid rgba(245,158,11,0.22); font-size:11.5px; color:#f59e0b; font-family:'Geist Mono',monospace;"><span style="width:6px;height:6px;border-radius:50%;background:#f59e0b;animation:kl-blink 1s infinite;flex:0 0 auto;"></span>sources updating — a sync is running for this space</div>
+          </sc-if>
+          <div data-chat-scroll style="flex:1; overflow-y:auto; padding:24px 26px; display:flex; flex-direction:column; gap:22px; min-height:0;">
+            <!-- switching skeleton (keeps the panel from flashing empty) -->
+            <sc-if value="{{ showChatSkeleton }}">
+              <div style="display:flex; flex-direction:column; gap:18px; width:100%;">
+                <div class="kl-skel" style="height:46px; border-radius:12px; width:54%; align-self:flex-end;"></div>
+                <div class="kl-skel" style="height:78px; border-radius:12px; width:82%;"></div>
+                <div class="kl-skel" style="height:46px; border-radius:12px; width:44%; align-self:flex-end;"></div>
+                <div class="kl-skel" style="height:64px; border-radius:12px; width:74%;"></div>
+              </div>
+            </sc-if>
+            <!-- no-connectors empty state -->
+            <sc-if value="{{ showNoConnectors }}">
+              <div style="margin:auto; text-align:center; max-width:440px; display:flex; flex-direction:column; align-items:center; gap:14px;">
+                <span style="width:46px;height:46px;border-radius:12px;background:rgba(245,158,11,0.13);border:1px dashed rgba(245,158,11,0.36);display:grid;place-items:center;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="1.6"><path d="m12 2 10 6-10 6L2 8z"/><path d="m2 17 10 6 10-6M2 12l10 6 10-6"/></svg></span>
+                <div><b style="font-size:16px;">No sources connected yet</b><div style="font-size:13px;color:#768493;margin-top:6px;line-height:1.5;">{{ spaceName }} has nothing to ground answers in. Connect a source — GitHub or Slack — and sync it to start chatting.</div></div>
+                <button onClick="{{ goSources }}" style="background:#e0454a; color:#fff; border:0; border-radius:8px; padding:10px 16px; font:600 13px 'Geist'; cursor:pointer;">Add a connector →</button>
+              </div>
+            </sc-if>
+            <!-- empty state -->
+            <sc-if value="{{ showEmpty }}">
+              <div style="margin:auto; text-align:center; max-width:440px; display:flex; flex-direction:column; align-items:center; gap:14px;">
+                <span style="width:46px;height:46px;border-radius:12px;background:rgba(224,69,74,0.13);border:1px dashed rgba(224,69,74,0.36);display:grid;place-items:center;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="6" cy="12" r="2.2" fill="#e0454a"/><circle cx="17" cy="6" r="2.2" fill="none" stroke="#e0454a" stroke-width="1.6"/><circle cx="17" cy="18" r="2.2" fill="none" stroke="#e0454a" stroke-width="1.6"/><path d="M8 11 15 7M8 13l7 4" stroke="#e0454a" stroke-width="1.3"/></svg></span>
+                <div><b style="font-size:16px;">Ask {{ spaceName }} anything</b><div style="font-size:13px;color:#768493;margin-top:6px;line-height:1.5;">Answers are grounded in this space's connected sources and follow its custom prompt.</div></div>
+              </div>
+            </sc-if>
+
+            <!-- messages -->
+            <sc-for list="{{ msgs }}" as="m" hint-placeholder-count="0">
+              <sc-if value="{{ m.isUser }}">
+                <div style="display:flex; gap:12px; align-items:flex-start; align-self:flex-end; max-width:78%;">
+                  <div style="background:#131c28; border:1px solid #1f2c3b; border-radius:12px 12px 4px 12px; padding:11px 14px; font-size:13.5px; line-height:1.55; color:#e8eef5;">{{ m.text }}</div>
+                  <span style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#fb7185,#f59e0b);display:grid;place-items:center;font-size:11px;font-weight:600;color:rgba(0,0,0,0.78);flex:0 0 auto;">SC</span>
+                </div>
+              </sc-if>
+              <sc-if value="{{ m.isAssistant }}">
+                <div style="display:flex; gap:12px; align-items:flex-start; max-width:90%;">
+                  <span style="{{ m.avatarStyle }}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="6" cy="12" r="2" fill="{{ m.avatarStroke }}"/><circle cx="17" cy="6" r="2" fill="none" stroke="{{ m.avatarStroke }}" stroke-width="1.5"/><circle cx="17" cy="18" r="2" fill="none" stroke="{{ m.avatarStroke }}" stroke-width="1.5"/><path d="M8 11 15 7M8 13l7 4" stroke="{{ m.avatarStroke }}" stroke-width="1.3"/></svg></span>
+                  <div style="font-size:13.5px; line-height:1.65; color:{{ m.textColor }};">
+                    <sc-if value="{{ m.isError }}">
+                      <div style="display:flex; align-items:flex-start; gap:8px;">
+                        <span style="flex:0 0 auto; margin-top:1px;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="{{ m.errIcon }}" stroke-width="1.9"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg></span>
+                        <span>{{ m.text }}</span>
+                      </div>
+                    </sc-if>
+                    <sc-if value="{{ m.isAnswer }}">
+                      <sc-if value="{{ m.isUngrounded }}"><div style="display:flex; align-items:center; gap:6px; margin-bottom:8px; font-size:11px; color:#f59e0b; border:1px solid rgba(245,158,11,0.3); border-radius:6px; padding:4px 9px; width:fit-content;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>{{ m.noticeLine }}</div></sc-if>
+                      <span><sc-for list="{{ m.segments }}" as="seg"><sc-if value="{{ seg.isText }}">{{ seg.v }}</sc-if><sc-if value="{{ seg.isInlineCode }}"><code style="font-family:'Geist Mono',monospace;font-size:12px;background:#0e1620;border:1px solid #1f2c3b;border-radius:4px;padding:1px 5px;color:#e8eef5;">{{ seg.v }}</code></sc-if><sc-if value="{{ seg.isCodeBlock }}"><div style="position:relative;margin:10px 0;"><button onClick="{{ seg.copy }}" title="Copy code" style="position:absolute;top:7px;right:7px;display:flex;align-items:center;gap:4px;background:#1a2532;border:1px solid #2a3a4c;border-radius:5px;padding:3px 7px;color:#aebac8;font:500 10px 'Geist';cursor:pointer;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Copy</button><pre style="margin:0;padding:12px 14px;background:#0b1118;border:1px solid #1f2c3b;border-radius:8px;overflow-x:auto;font-family:'Geist Mono',monospace;font-size:12px;line-height:1.55;color:#dbe5f0;white-space:pre;"><code>{{ seg.v }}</code></pre></div></sc-if><sc-if value="{{ seg.isCite }}"><sup style="color:{{ seg.color }};font-family:'Geist Mono',monospace;font-size:10px;cursor:{{ seg.cursor }};">[{{ seg.v }}]</sup></sc-if></sc-for><sc-if value="{{ m.streaming }}"><span style="display:inline-block;width:7px;height:14px;background:#e0454a;margin-left:2px;vertical-align:text-bottom;animation:kl-blink 1s infinite;"></span></sc-if></span>
+                      <sc-if value="{{ m.hasSources }}"><div style="display:flex; gap:7px; flex-wrap:wrap; margin-top:10px;"><span style="font-size:11px;color:#768493;border:1px solid #1f2c3b;border-radius:6px;padding:3px 9px;font-family:'Geist Mono',monospace;">{{ m.sourceLine }}</span></div></sc-if>
+                    </sc-if>
+                  </div>
+                </div>
+              </sc-if>
+            </sc-for>
+
+            <!-- loading bubble -->
+            <sc-if value="{{ loading }}">
+              <div style="display:flex; gap:12px; align-items:flex-start;">
+                <span style="width:28px;height:28px;border-radius:7px;background:rgba(224,69,74,0.13);border:1px dashed rgba(224,69,74,0.36);display:grid;place-items:center;flex:0 0 auto;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="6" cy="12" r="2" fill="#e0454a"/><circle cx="17" cy="6" r="2" fill="none" stroke="#e0454a" stroke-width="1.5"/><circle cx="17" cy="18" r="2" fill="none" stroke="#e0454a" stroke-width="1.5"/></svg></span>
+                <div style="display:flex; flex-direction:column; gap:8px;">
+                  <span style="font-size:11px; color:#768493; font-family:'Geist Mono',monospace;">{{ loadingLabel }}</span>
+                  <div style="display:flex; gap:5px; align-items:center; padding:4px 0;">
+                    <span style="width:7px;height:7px;border-radius:50%;background:#e0454a;animation:kl-bounce 1.2s infinite;"></span>
+                    <span style="width:7px;height:7px;border-radius:50%;background:#e0454a;animation:kl-bounce 1.2s infinite .2s;"></span>
+                    <span style="width:7px;height:7px;border-radius:50%;background:#e0454a;animation:kl-bounce 1.2s infinite .4s;"></span>
+                  </div>
+                </div>
+              </div>
+            </sc-if>
+          </div>
+
+          <!-- composer -->
+          <div style="padding:14px 22px 18px; border-top:1px solid #1f2c3b; flex:0 0 auto;">
+            <div style="display:flex; align-items:center; gap:10px; background:#0e1620; border:1px solid #2a3a4c; border-radius:10px; padding:10px 12px;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#768493" stroke-width="1.7"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+              <input value="{{ draft }}" onInput="{{ onDraft }}" onKeyDown="{{ onKey }}" placeholder="{{ composerPlaceholder }}" style="flex:1; background:transparent; border:0; color:#e8eef5; font:13.5px 'Geist'; outline:none; min-width:0;">
+              <span style="font-size:10px;color:#768493;font-family:'Geist Mono',monospace;border:1px solid #1f2c3b;border-radius:4px;padding:2px 6px;">↵</span>
+              <sc-if value="{{ streaming }}">
+                <button onClick="{{ stopStream }}" title="Stop generating" style="width:32px;height:32px;border-radius:7px;background:#131c28;border:1px solid #38495c;display:grid;place-items:center;cursor:pointer;"><svg width="13" height="13" viewBox="0 0 24 24" fill="#e0454a"><rect x="6" y="6" width="12" height="12" rx="2"/></svg></button>
+              </sc-if>
+              <sc-if value="{{ notStreaming }}">
+                <button onClick="{{ send }}" style="width:32px;height:32px;border-radius:7px;background:#e0454a;border:0;display:grid;place-items:center;cursor:pointer;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg></button>
+              </sc-if>
+            </div>
+            <sc-if value="{{ hasLastTiming }}"><div title="{{ lastTimingLabel }}" style="margin-top:9px; display:flex; align-items:center; gap:9px;"><span style="font-size:9px; letter-spacing:0.09em; text-transform:uppercase; color:#4d5b6b; font-family:'Geist Mono',monospace;">Last reply</span><div style="flex:0 0 110px; display:flex; height:5px; border-radius:3px; overflow:hidden; background:#0e1620;"><sc-for list="{{ lastTimingBar }}" as="tb"><span title="{{ tb.title }}" style="width:{{ tb.width }}; background:{{ tb.color }}; display:block;"></span></sc-for></div><span style="font-size:10px; color:#5a6b7d; font-family:'Geist Mono',monospace;">{{ lastTimingLabel }}</span></div></sc-if>
+          </div>
+        </div>
+
+        <!-- sources rail -->
+        <aside style="background:#0a1118; display:flex; flex-direction:column; min-height:0;">
+          <div style="padding:16px 16px 12px; border-bottom:1px solid #1f2c3b; flex:0 0 auto;">
+            <div style="font-size:10px; letter-spacing:0.1em; color:#768493; text-transform:uppercase; font-family:'Geist Mono',monospace;">Retrieved context</div>
+            <div style="font-size:11.5px; color:#4d5b6b; margin-top:4px;">{{ railSubtitle }}</div>
+          </div>
+          <div style="flex:1; overflow-y:auto; padding:14px; display:flex; flex-direction:column; gap:10px; min-height:0;">
+            <sc-if value="{{ railBusy }}">
+              <div class="kl-skel" style="height:92px;border-radius:9px;"></div>
+              <div class="kl-skel" style="height:92px;border-radius:9px;"></div>
+              <div class="kl-skel" style="height:92px;border-radius:9px;"></div>
+            </sc-if>
+            <sc-if value="{{ showSources }}">
+              <sc-for list="{{ railSources }}" as="s" hint-placeholder-count="3">
+                <div style="background:#0e1620; border:1px solid #1f2c3b; border-radius:9px; padding:12px;">
+                  <div style="display:flex; align-items:center; gap:8px; margin-bottom:7px;">
+                    <span style="color:#e0454a;font-family:'Geist Mono',monospace;font-size:10px;">[{{ s.n }}]</span>
+                    <sc-if value="{{ s.isGithub }}"><svg width="14" height="14" viewBox="0 0 24 24" fill="#aebac8"><path d="M12 .5C5.37.5 0 5.87 0 12.5c0 5.3 3.44 9.8 8.2 11.39.6.11.82-.26.82-.58v-2c-3.34.73-4.04-1.6-4.04-1.6-.55-1.39-1.34-1.76-1.34-1.76-1.08-.74.09-.73.09-.73 1.2.09 1.83 1.24 1.83 1.24 1.07 1.83 2.8 1.3 3.49.99.11-.78.42-1.3.76-1.6-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.13-.3-.54-1.52.12-3.18 0 0 1.01-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.29-1.55 3.3-1.23 3.3-1.23.66 1.66.25 2.88.12 3.18.77.84 1.23 1.91 1.23 3.22 0 4.61-2.8 5.62-5.48 5.92.43.37.81 1.1.81 2.22v3.29c0 .32.22.7.83.58A12 12 0 0 0 24 12.5C24 5.87 18.63.5 12 .5z"/></svg></sc-if>
+                    <sc-if value="{{ s.isGdoc }}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="1.7"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg></sc-if>
+                    <sc-if value="{{ s.isSlack }}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="1.7"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M14.5 10c0 1.38-1.12 2.5-2.5 2.5S9.5 11.38 9.5 10"/></svg></sc-if>
+                    <sc-if value="{{ s.isUpload }}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="1.7"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M9 13h6M9 17h6"/></svg></sc-if>
+                    <b style="font-size:12px; color:#e8eef5; font-family:'Geist Mono',monospace; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ s.title }}</b>
+                    <span style="margin-left:auto; font-size:10px; font-family:'Geist Mono',monospace; color:{{ s.scoreColor }};">{{ s.score }}</span>
+                  </div>
+                  <p style="font-size:11.5px; line-height:1.5; color:#768493; margin:0;">{{ s.snippet }}</p>
+                  <div style="height:3px; background:#1f2c3b; border-radius:2px; margin-top:9px; overflow:hidden;"><div style="height:100%; width:{{ s.barPct }}; background:{{ s.barColor }};"></div></div>
+                </div>
+              </sc-for>
+            </sc-if>
+            <sc-if value="{{ showRailHint }}">
+              <div style="margin:auto; text-align:center; color:#4d5b6b; font-size:12px; padding:20px; line-height:1.6;">Ask a question and the chunks retrieved from the vector index will appear here, ranked by similarity.</div>
+            </sc-if>
+          </div>
+        </aside>
+      </div>
+    </sc-if>
+
+    <!-- SOURCES VIEW -->
+    <sc-if value="{{ isSources }}">
+      <div style="height:54px; border-bottom:1px solid #1f2c3b; display:flex; align-items:center; gap:10px; padding:0 22px; flex:0 0 auto;">
+        <span style="{{ headerDotStyle }}"></span><b style="font-size:14px;">{{ spaceName }}</b>
+        <span style="font-size:11px; color:#768493; font-family:'Geist Mono',monospace;">· sources &amp; behavior</span>
+      </div>
+      <div style="flex:1; overflow-y:auto; padding:24px 26px; min-height:0;">
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:24px; max-width:1100px;">
+          <!-- connectors -->
+          <div>
+            <div style="font-size:10px; letter-spacing:0.1em; color:#768493; text-transform:uppercase; font-family:'Geist Mono',monospace; margin-bottom:12px;">Connected sources</div>
+            <div style="display:flex; flex-direction:column; gap:10px;">
+              <sc-for list="{{ connectors }}" as="cn" hint-placeholder-count="2">
+                <div style="background:#0e1620; border:1px solid #1f2c3b; border-radius:10px; padding:13px 14px;">
+                  <div style="display:flex; align-items:center; gap:12px;">
+                    <sc-if value="{{ cn.isGithub }}"><svg width="20" height="20" viewBox="0 0 24 24" fill="#e8eef5"><path d="M12 .5C5.37.5 0 5.87 0 12.5c0 5.3 3.44 9.8 8.2 11.39.6.11.82-.26.82-.58v-2c-3.34.73-4.04-1.6-4.04-1.6-.55-1.39-1.34-1.76-1.34-1.76-1.08-.74.09-.73.09-.73 1.2.09 1.83 1.24 1.83 1.24 1.07 1.83 2.8 1.3 3.49.99.11-.78.42-1.3.76-1.6-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.13-.3-.54-1.52.12-3.18 0 0 1.01-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.29-1.55 3.3-1.23 3.3-1.23.66 1.66.25 2.88.12 3.18.77.84 1.23 1.91 1.23 3.22 0 4.61-2.8 5.62-5.48 5.92.43.37.81 1.1.81 2.22v3.29c0 .32.22.7.83.58A12 12 0 0 0 24 12.5C24 5.87 18.63.5 12 .5z"/></svg></sc-if>
+                    <sc-if value="{{ cn.isSlack }}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="1.7"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M14.5 10c0 1.38-1.12 2.5-2.5 2.5S9.5 11.38 9.5 10M9 14h6"/></svg></sc-if>
+                    <sc-if value="{{ cn.isUpload }}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="1.7"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M9 13h6M9 17h6"/></svg></sc-if>
+                    <div style="flex:1;min-width:0;"><b style="font-size:13px;">{{ cn.name }}</b><div style="font-size:10.5px;color:#768493;font-family:'Geist Mono',monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ cn.detail }}</div></div>
+                    <span style="font-size:10px;color:{{ cn.color }};display:inline-flex;align-items:center;gap:5px;font-family:'Geist Mono',monospace;flex:0 0 auto;"><span style="width:6px;height:6px;border-radius:50%;background:{{ cn.color }};"></span>{{ cn.statusLabel }}</span>
+                  </div>
+                  <sc-if value="{{ cn.showPartial }}">
+                    <div style="margin-top:10px; border-top:1px solid #1f2c3b; padding-top:9px; display:flex; flex-direction:column; gap:5px;">
+                      <sc-for list="{{ cn.targetResults }}" as="tr">
+                        <div style="display:flex; align-items:center; gap:7px; font-size:11px; font-family:'Geist Mono',monospace;">
+                          <span style="width:5px;height:5px;border-radius:50%;background:{{ tr.color }};flex:0 0 auto;"></span>
+                          <span style="color:#aebac8;">{{ tr.targetId }}</span>
+                          <span style="color:#768493;margin-left:auto;">{{ tr.detail }}</span>
+                        </div>
+                      </sc-for>
+                    </div>
+                  </sc-if>
+                  <div style="margin-top:10px; display:flex; align-items:center; gap:8px;">
+                    <sc-if value="{{ cn.hasActions }}">
+                      <button onClick="{{ cn.validate }}" style="font-size:11px; color:#aebac8; background:#131c28; border:1px solid #2a3a4c; border-radius:6px; padding:5px 10px; cursor:pointer;">Validate</button>
+                      <button onClick="{{ cn.sync }}" disabled="{{ cn.syncDisabled }}" title="{{ cn.syncTooltip }}" style="{{ cn.syncBtnStyle }}">{{ cn.syncLabel }}</button>
+                    </sc-if>
+                    <button onClick="{{ cn.remove }}" title="Remove connector" style="margin-left:auto; font-size:11px; color:#768493; background:transparent; border:0; cursor:pointer;">Remove</button>
+                  </div>
+                </div>
+              </sc-for>
+
+              <sc-if value="{{ noConnectors }}">
+                <div style="text-align:center; color:#4d5b6b; font-size:12px; padding:16px; line-height:1.55; background:#070a0e; border:1px dashed #2a3a4c; border-radius:10px;">No connectors yet — add a source to start ingesting into this space's vector index.</div>
+              </sc-if>
+
+              <!-- add connector -->
+              <sc-if value="{{ showAddForm }}">
+                <div style="background:#070a0e; border:1px solid #2a3a4c; border-radius:10px; padding:14px;">
+                  <div style="font-size:11px; color:#aebac8; font-weight:500; margin-bottom:8px;">Add a connector</div>
+                  <div style="display:flex; gap:7px; margin-bottom:9px;">
+                    <sc-for list="{{ kindOptions }}" as="ko">
+                      <button onClick="{{ ko.select }}" style="{{ ko.style }}">{{ ko.label }}</button>
+                    </sc-for>
+                  </div>
+                  <input value="{{ newCred }}" onInput="{{ onNewCred }}" type="password" placeholder="{{ credPlaceholder }}" style="width:100%; background:#0e1620; border:1px solid #2a3a4c; border-radius:8px; padding:9px 11px; color:#e8eef5; font:12px 'Geist Mono',monospace; outline:none;">
+                  <sc-if value="{{ showTargetInput }}">
+                    <input value="{{ newTargets }}" onInput="{{ onNewTargets }}" type="text" placeholder="{{ targetPlaceholder }}" style="width:100%; margin-top:8px; background:#0e1620; border:1px solid #2a3a4c; border-radius:8px; padding:9px 11px; color:#e8eef5; font:12px 'Geist Mono',monospace; outline:none;">
+                  </sc-if>
+                  <div style="display:flex; gap:8px; margin-top:10px;">
+                    <button onClick="{{ submitConnector }}" style="font-size:12px; color:#fff; background:#e0454a; border:0; border-radius:7px; padding:8px 14px; cursor:pointer;">Add &amp; save</button>
+                    <button onClick="{{ cancelAddForm }}" style="font-size:12px; color:#aebac8; background:#0e1620; border:1px solid #1f2c3b; border-radius:7px; padding:8px 14px; cursor:pointer;">Cancel</button>
+                  </div>
+                  <div style="font-size:10.5px; color:#768493; margin-top:9px; line-height:1.5;">After adding, click <b style="color:#aebac8;">Validate</b> then <b style="color:#aebac8;">Sync</b> to ingest the listed targets. Tokens are stored server-side and never shown back.</div>
+                </div>
+              </sc-if>
+              <sc-if value="{{ hideAddForm }}">
+                <button onClick="{{ openAddForm }}" style="display:flex; align-items:center; justify-content:center; gap:9px; background:#070a0e; border:1px dashed #2a3a4c; border-radius:10px; padding:14px; color:#768493; cursor:pointer; font:12.5px 'Geist'; width:100%;">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#768493" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Add a connector
+                </button>
+              </sc-if>
+
+              <!-- upload files -->
+              <button onClick="{{ pickUploadFiles }}" onDragOver="{{ onUploadDragOver }}" onDragLeave="{{ onUploadDragLeave }}" onDrop="{{ onUploadDrop }}" disabled="{{ uploadBusy }}" title="Upload or drag & drop text, markdown, or code files" style="{{ uploadBtnStyle }}">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>{{ uploadLabel }}
+              </button>
+
+              <div style="display:flex; align-items:center; gap:8px; font-family:'Geist Mono',monospace; font-size:11px; color:#768493; background:#0e1620; border:1px solid #1f2c3b; border-radius:8px; padding:10px 12px; margin-top:2px;">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#e0454a" stroke-width="1.8"><path d="m12 2 10 6-10 6L2 8z"/><path d="m2 17 10 6 10-6M2 12l10 6 10-6"/></svg>{{ vectorLine }}
+              </div>
+
+              <!-- files in context -->
+              <sc-if value="{{ hasDocs }}">
+                <div style="margin-top:6px;">
+                  <div style="font-size:10px; letter-spacing:0.1em; color:#768493; text-transform:uppercase; font-family:'Geist Mono',monospace; margin-bottom:8px;">Files in context · {{ docCount }}</div>
+                  <div style="display:flex; flex-direction:column; gap:2px; max-height:230px; overflow-y:auto; background:#070a0e; border:1px solid #1f2c3b; border-radius:10px; padding:6px;">
+                    <sc-for list="{{ spaceDocs }}" as="d">
+                      <div title="{{ d.title }}" style="display:flex; align-items:center; gap:9px; padding:6px 8px; border-radius:6px;">
+                        <span style="flex:0 0 auto; font-size:9px; font-family:'Geist Mono',monospace; color:{{ d.tagColor }}; border:1px solid {{ d.tagColor }}; border-radius:4px; padding:1px 5px; opacity:0.85;">{{ d.tag }}</span>
+                        <span style="flex:1; min-width:0; font-size:12px; color:#cbd5e1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ d.title }}</span>
+                        <span style="flex:0 0 auto; font-size:10px; color:#5a6b7d; font-family:'Geist Mono',monospace;">{{ d.chunkLabel }}</span>
+                      </div>
+                    </sc-for>
+                  </div>
+                </div>
+              </sc-if>
+            </div>
+          </div>
+          <!-- custom prompt -->
+          <div>
+            <div style="display:flex; align-items:center; margin-bottom:12px;"><span style="font-size:10px; letter-spacing:0.1em; color:#768493; text-transform:uppercase; font-family:'Geist Mono',monospace;">Custom system prompt</span><button onClick="{{ openPrompt }}" style="margin-left:auto; font-size:11px; color:#e0454a; background:transparent; border:0; cursor:pointer; display:inline-flex; align-items:center; gap:5px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>Edit</button></div>
+            <div style="background:#070a0e; border:1px solid #2a3a4c; border-radius:10px; padding:14px; font-family:'Geist Mono',monospace; font-size:12px; line-height:1.7; color:#aebac8; white-space:pre-wrap; min-height:220px;">{{ promptPreview }}</div>
+            <div style="font-size:11px; color:#768493; font-family:'Geist Mono',monospace; margin-top:10px;">applies to all chats &amp; agents in this space</div>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- AGENTS VIEW -->
+    <sc-if value="{{ isAgents }}">
+      <div style="display:grid; grid-template-columns:300px 1fr; min-height:0; flex:1;">
+        <aside style="border-right:1px solid #1f2c3b; display:flex; flex-direction:column; min-height:0;">
+          <div style="height:54px; border-bottom:1px solid #1f2c3b; display:flex; align-items:center; gap:9px; padding:0 16px; flex:0 0 auto;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#e0454a" stroke-width="1.8"><path d="M12 6V3M9 8h6a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2ZM3 14h2M19 14h2M9 13h.01M15 13h.01"/></svg>
+            <b style="font-size:13.5px;">Agents</b>
+            <span style="margin-left:auto; width:26px;height:26px;border-radius:6px;background:#e0454a;display:grid;place-items:center;cursor:pointer;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span>
+          </div>
+          <div style="padding:12px; display:flex; flex-direction:column; gap:8px; overflow-y:auto; min-height:0;">
+            <sc-if value="{{ hasAgents }}" hint-placeholder-val="{{ true }}">
+              <sc-for list="{{ agentList }}" as="ag" hint-placeholder-count="3">
+                <div onClick="{{ ag.select }}" style="{{ ag.rowStyle }}">
+                  <span style="width:28px;height:28px;border-radius:6px;display:grid;place-items:center;flex:0 0 auto;background:{{ ag.iconBg }};">
+                    <sc-if value="{{ ag.isClock }}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="{{ ag.iconColor }}" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></sc-if>
+                    <sc-if value="{{ ag.isChevron }}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="{{ ag.iconColor }}" stroke-width="1.8"><path d="M9 18l6-6-6-6"/></svg></sc-if>
+                    <sc-if value="{{ ag.isPulse }}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="{{ ag.iconColor }}" stroke-width="1.8"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></sc-if>
+                  </span>
+                  <div style="flex:1;min-width:0;"><b style="font-size:13px;">{{ ag.name }}</b><div style="font-size:10px;color:#768493;font-family:'Geist Mono',monospace;">{{ ag.sched }}</div></div>
+                  <span style="{{ ag.dotStyle }}"></span>
+                </div>
+              </sc-for>
+            </sc-if>
+            <sc-if value="{{ noAgents }}"><div style="padding:14px; font-size:12px; color:#4d5b6b; line-height:1.5; text-align:center;">No agents in this space yet. Add one to run on a schedule.</div></sc-if>
+          </div>
+        </aside>
+
+        <main style="display:flex; flex-direction:column; overflow:hidden; min-height:0;">
+          <sc-if value="{{ selectedAgent }}" hint-placeholder-val="{{ true }}">
+            <div style="height:54px; border-bottom:1px solid #1f2c3b; display:flex; align-items:center; gap:10px; padding:0 20px; flex:0 0 auto;">
+              <b style="font-size:14px;">{{ selectedAgent.name }}</b>
+              <span style="font-size:10px;color:{{ selectedAgent.statusColor }};border:1px solid {{ selectedAgent.statusBorder }};background:{{ selectedAgent.statusBg }};border-radius:999px;padding:2px 9px;font-family:'Geist Mono',monospace;">{{ selectedAgent.statusLabel }}</span>
+              <label onClick="{{ selectedAgent.toggle }}" style="margin-left:auto; display:inline-flex; align-items:center; gap:8px; cursor:pointer;"><span style="font-size:12px;color:#aebac8;">{{ selectedAgent.enabledLabel }}</span><span style="{{ selectedAgent.trackStyle }}"><span style="{{ selectedAgent.thumbStyle }}"></span></span></label>
+            </div>
+            <div style="flex:1; overflow-y:auto; padding:20px 22px; display:flex; flex-direction:column; gap:18px; min-height:0;">
+              <div>
+                <div style="font-size:11px; color:#aebac8; font-weight:500; margin-bottom:7px;">Instruction</div>
+                <div style="background:#0e1620; border:1px solid #1f2c3b; border-radius:8px; padding:11px 12px; font-size:12px; line-height:1.55; color:#aebac8; font-family:'Geist Mono',monospace;">{{ selectedAgent.instruction }}</div>
+              </div>
+              <div>
+                <div style="font-size:11px; color:#aebac8; font-weight:500; margin-bottom:7px; display:flex; align-items:center; gap:7px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#e0454a" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Schedule</div>
+                <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+                  <div style="display:inline-flex; background:#0e1620; border:1px solid #1f2c3b; border-radius:8px; padding:3px;">
+                    <sc-for list="{{ selectedAgent.schedTabs }}" as="tab"><span style="{{ tab.style }}">{{ tab.k }}</span></sc-for>
+                  </div>
+                  <span style="font-size:12px; color:#768493;">at</span>
+                  <div style="display:inline-flex; align-items:center; gap:8px; background:#0e1620; border:1px solid #2a3a4c; border-radius:8px; padding:7px 12px; font-family:'Geist Mono',monospace; font-size:13px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#768493" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>{{ selectedAgent.time }}</div>
+                  <span style="font-size:12px; color:#768493;">·</span>
+                  <div style="display:inline-flex; align-items:center; background:#0e1620; border:1px solid #1f2c3b; border-radius:8px; padding:7px 12px; font-size:12px; color:#aebac8;">{{ selectedAgent.tz }}</div>
+                </div>
+                <div style="display:flex; gap:6px; margin-top:10px;">
+                  <sc-for list="{{ selectedAgent.days }}" as="d"><span style="{{ d.style }}">{{ d.label }}</span></sc-for>
+                </div>
+              </div>
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+                <div>
+                  <div style="font-size:11px; color:#aebac8; font-weight:500; margin-bottom:7px;">Delivers to</div>
+                  <div style="background:#0e1620; border:1px solid #1f2c3b; border-radius:8px; padding:10px 12px; display:flex; align-items:center; gap:9px;">
+                    <sc-if value="{{ selectedAgent.delSlack }}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="1.7"><rect x="3" y="3" width="18" height="18" rx="4"/></svg></sc-if>
+                    <sc-if value="{{ selectedAgent.delGithub }}"><svg width="15" height="15" viewBox="0 0 24 24" fill="#aebac8"><path d="M12 .5C5.37.5 0 5.87 0 12.5c0 5.3 3.44 9.8 8.2 11.39.6.11.82-.26.82-.58v-2c-3.34.73-4.04-1.6-4.04-1.6-.55-1.39-1.34-1.76-1.34-1.76-1.08-.74.09-.73.09-.73 1.2.09 1.83 1.24 1.83 1.24 1.07 1.83 2.8 1.3 3.49.99.11-.78.42-1.3.76-1.6-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.13-.3-.54-1.52.12-3.18 0 0 1.01-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.29-1.55 3.3-1.23 3.3-1.23.66 1.66.25 2.88.12 3.18.77.84 1.23 1.91 1.23 3.22 0 4.61-2.8 5.62-5.48 5.92.43.37.81 1.1.81 2.22v3.29c0 .32.22.7.83.58A12 12 0 0 0 24 12.5C24 5.87 18.63.5 12 .5z"/></svg></sc-if>
+                    <sc-if value="{{ selectedAgent.delGdoc }}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="1.7"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg></sc-if>
+                    <span style="font-size:12.5px;">{{ selectedAgent.deliver }}</span>
+                  </div>
+                </div>
+                <div>
+                  <div style="font-size:11px; color:#aebac8; font-weight:500; margin-bottom:7px;">Grounded in</div>
+                  <div style="background:#0e1620; border:1px solid #1f2c3b; border-radius:8px; padding:10px 12px; display:flex; align-items:center; gap:9px;"><span style="{{ headerDotStyle }}"></span><span style="font-size:12.5px;">{{ spaceName }} <span style="color:#768493;font-family:'Geist Mono',monospace;">space</span></span></div>
+                </div>
+              </div>
+              <div style="margin-top:auto; border-top:1px solid #1f2c3b; padding-top:14px; display:flex; align-items:center; gap:18px; font-family:'Geist Mono',monospace; font-size:11px;">
+                <div><div style="color:#768493;">LAST RUN</div><div style="color:#aebac8; margin-top:3px;">{{ selectedAgent.last }}</div></div>
+                <div><div style="color:#768493;">NEXT RUN</div><div style="color:#aebac8; margin-top:3px;">{{ selectedAgent.next }}</div></div>
+                <button onClick="{{ selectedAgent.runNow }}" style="margin-left:auto; font-size:12px; color:#e0454a; background:transparent; border:0; cursor:pointer; font-family:'Geist',sans-serif;">Run now →</button>
+              </div>
+            </div>
+          </sc-if>
+        </main>
+      </div>
+    </sc-if>
+
+    <!-- MEMBERS VIEW (admin/owner only) -->
+    <sc-if value="{{ isMembers }}">
+      <div style="height:54px; border-bottom:1px solid #1f2c3b; display:flex; align-items:center; gap:10px; padding:0 22px; flex:0 0 auto;">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#e0454a" stroke-width="1.8"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        <b style="font-size:14px;">Members &amp; access</b>
+        <span style="font-size:11px; color:#768493; font-family:'Geist Mono',monospace;">· accounts &amp; workspace roles · grant space access from inside each space</span>
+        <span onClick="{{ openInvite }}" style="margin-left:auto; display:inline-flex;align-items:center;gap:7px;font-size:12px;color:#fff;background:#e0454a;border-radius:7px;padding:6px 12px;cursor:pointer;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>New account</span>
+      </div>
+      <sc-if value="{{ secondAdminNudge }}">
+        <div style="margin:12px 22px 0; padding:11px 14px; display:flex; align-items:center; gap:10px; font-size:12.5px; color:#f5c451; background:rgba(245,196,81,0.08); border:1px solid rgba(245,196,81,0.28); border-radius:9px;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#f5c451" stroke-width="1.8"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0zM12 9v4M12 17h.01"/></svg>
+          <span style="flex:1;">Only one admin exists. A sole admin who loses their password can't be recovered — promote a second person to admin.</span>
+          <span onClick="{{ dismissNudge }}" style="color:#768493; cursor:pointer; font-size:11.5px;">Dismiss</span>
+        </div>
+      </sc-if>
+      <div style="flex:1; overflow-y:auto; min-height:0;">
+        <table style="width:100%; border-collapse:collapse; font-size:13px;">
+          <thead>
+            <tr style="border-bottom:1px solid #1f2c3b;">
+              <th style="text-align:left; padding:13px 22px; font-size:10px; color:#768493; font-weight:500; letter-spacing:0.08em; text-transform:uppercase; font-family:'Geist Mono',monospace;">Member</th>
+              <th style="text-align:center; padding:13px 10px; font-size:10px; color:#768493; font-weight:500; letter-spacing:0.08em; text-transform:uppercase; font-family:'Geist Mono',monospace;">Workspace role</th>
+              <th style="text-align:center; padding:13px 10px; font-size:10px; color:#768493; font-weight:500; letter-spacing:0.08em; text-transform:uppercase; font-family:'Geist Mono',monospace;">Access</th>
+              <th style="text-align:right; padding:13px 22px; font-size:10px; color:#768493; font-weight:500; letter-spacing:0.08em; text-transform:uppercase; font-family:'Geist Mono',monospace;">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <sc-for list="{{ matrixRows }}" as="r" hint-placeholder-count="4">
+              <tr style="border-bottom:1px solid #1f2c3b;">
+                <td style="padding:12px 22px;">
+                  <div style="display:flex;align-items:center;gap:10px;">
+                    <span style="width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-size:10px;font-weight:600;color:rgba(0,0,0,0.78);flex:0 0 auto;background:{{ r.grad }};">{{ r.initials }}</span>
+                    <div><b style="font-size:13px;font-weight:500;">{{ r.name }}</b><div style="font-size:10px;color:#768493;font-family:'Geist Mono',monospace;">{{ r.email }}</div></div>
+                    <sc-if value="{{ r.pending }}"><span style="font-size:9.5px;color:#f5c451;border:1px solid rgba(245,196,81,0.3);border-radius:999px;padding:1px 7px;font-family:'Geist Mono',monospace;">PENDING</span></sc-if>
+                  </div>
+                </td>
+                <td style="text-align:center;"><span style="{{ r.wsStyle }}">{{ r.wsLabel }}</span></td>
+                <td style="text-align:center; font-size:11.5px; color:#768493; font-family:'Geist Mono',monospace;">{{ r.spacesLabel }}</td>
+                <td style="text-align:right; padding:12px 22px; white-space:nowrap;">
+                  <span onClick="{{ r.reset }}" style="font-size:11px;color:#768493;cursor:pointer;margin-right:12px;">Reset pw</span>
+                  <sc-if value="{{ r.canPromote }}"><span onClick="{{ r.promote }}" style="font-size:11px;color:#60a5fa;cursor:pointer;">Make admin</span></sc-if>
+                  <sc-if value="{{ r.canDemote }}"><span onClick="{{ r.demote }}" style="font-size:11px;color:#f87171;cursor:pointer;">Demote</span></sc-if>
+                </td>
+              </tr>
+            </sc-for>
+          </tbody>
+        </table>
+        <div style="padding:14px 22px; display:flex; align-items:center; gap:8px; font-size:11.5px; color:#768493;">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#e0454a" stroke-width="1.8"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/></svg>
+          Owners and admins reach every space. Editors ingest and manage sources; viewers chat and read.
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- ACCESS VIEW (per-space; admin/owner only) -->
+    <sc-if value="{{ isAccess }}">
+      <div style="height:54px; border-bottom:1px solid #1f2c3b; display:flex; align-items:center; gap:10px; padding:0 22px; flex:0 0 auto;">
+        <span style="{{ headerDotStyle }}"></span><b style="font-size:14px;">{{ accessSpaceName }}</b>
+        <span style="font-size:11px; color:#768493; font-family:'Geist Mono',monospace;">· who can access this space</span>
+        <span onClick="{{ openAddDrawer }}" style="margin-left:auto; display:inline-flex; align-items:center; gap:7px; font-size:12px; color:#fff; background:#e0454a; border-radius:7px; padding:6px 12px; cursor:pointer;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM19 8v6M22 11h-6"/></svg>Add member</span>
+      </div>
+      <div style="flex:1; overflow-y:auto; min-height:0; padding:20px 0;">
+        <div style="max-width:760px; margin:0 auto; padding:0 26px;">
+          <p style="color:#768493; font-size:12.5px; line-height:1.6; margin:0 0 18px;"><b style="color:#aebac8;">Chat only access</b> = chat &amp; read this space. <b style="color:#aebac8;">Chat and source access</b> = also ingest &amp; manage its sources. Owners and admins always have full access.</p>
+
+          <sc-for list="{{ accessAdminRows }}" as="a">
+            <div style="display:flex; align-items:center; gap:12px; padding:11px 14px; border:1px solid #1f2c3b; border-radius:10px; margin-bottom:8px; background:#0a1118;">
+              <span style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#fb7185,#f59e0b);display:grid;place-items:center;font-size:10px;font-weight:600;color:rgba(0,0,0,0.78);flex:0 0 auto;">{{ a.initials }}</span>
+              <span style="flex:1; min-width:0; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ a.email }}<span style="color:#768493;">{{ a.nameSuffix }}</span></span>
+              <span style="{{ a.wsBadgeStyle }}">{{ a.wsBadge }}</span>
+            </div>
+          </sc-for>
+          <sc-for list="{{ accessGrantedRows }}" as="a" hint-placeholder-count="2">
+            <div style="display:flex; align-items:center; gap:12px; padding:11px 14px; border:1px solid #1f2c3b; border-radius:10px; margin-bottom:8px; background:#0a1118;">
+              <span style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#60a5fa,#a78bfa);display:grid;place-items:center;font-size:10px;font-weight:600;color:rgba(0,0,0,0.78);flex:0 0 auto;">{{ a.initials }}</span>
+              <span style="flex:1; min-width:0; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ a.email }}</span>
+              <span style="display:inline-flex;">
+                <span onClick="{{ a.setChat }}" style="{{ a.chatStyle }}">Chat only access</span>
+                <span onClick="{{ a.setSource }}" style="{{ a.sourceStyle }}">Chat and source access</span>
+              </span>
+              <span onClick="{{ a.remove }}" title="Remove access" style="margin-left:4px; width:26px;height:26px;border-radius:6px;display:grid;place-items:center;color:#768493;cursor:pointer;flex:0 0 auto;border:1px solid #2a3a4c;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></span>
+            </div>
+          </sc-for>
+          <sc-if value="{{ noGranted }}">
+            <div style="padding:22px; text-align:center; color:#4d5b6b; font-size:12.5px; line-height:1.6; border:1px dashed #1f2c3b; border-radius:10px;">Only owners and admins (above) can reach this space so far. Use <b style="color:#768493;">Add member</b> to grant a specific person access.</div>
+          </sc-if>
+        </div>
+      </div>
+    </sc-if>
+
+  </main>
+</div>
+</sc-if>
+
+<!-- ========= CUSTOM PROMPT MODAL ========= -->
+<sc-if value="{{ promptOpen }}">
+  <div onClick="{{ closePrompt }}" style="position:fixed; inset:0; background:rgba(2,6,11,0.65); backdrop-filter:blur(4px); display:grid; place-items:center; z-index:100; padding:20px;">
+    <div onClick="{{ stop }}" style="width:620px; max-width:100%; background:#0a1118; border:1px solid #2a3a4c; border-radius:16px; box-shadow:0 24px 64px rgba(0,0,0,0.6); overflow:hidden; display:flex; flex-direction:column;">
+      <div style="padding:18px 20px 14px; border-bottom:1px solid #1f2c3b; display:flex; align-items:flex-start; gap:12px;">
+        <span style="width:32px;height:32px;border-radius:8px;background:rgba(224,69,74,0.13);display:grid;place-items:center;flex:0 0 auto;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#e0454a" stroke-width="1.8"><path d="m12 2 2.4 7.4H22l-6 4.6 2.3 7.4-6.3-4.6L5.7 21l2.3-7.4-6-4.6h7.6z"/></svg></span>
+        <div style="flex:1;"><h3 style="font-size:15px; font-weight:600; margin:0;">Custom prompt · {{ spaceName }}</h3><p style="color:#768493; font-size:12px; margin:4px 0 0;">Applies to every chat and agent in this space. Supports {{ promptVarsHint }} variables.</p></div>
+        <button onClick="{{ closePrompt }}" style="width:30px;height:30px;border-radius:6px;background:transparent;border:0;color:#768493;cursor:pointer;display:grid;place-items:center;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+      </div>
+      <div style="padding:18px 20px;">
+        <textarea value="{{ promptText }}" onInput="{{ onPromptInput }}" style="width:100%; min-height:220px; background:#070a0e; border:1px solid #2a3a4c; border-radius:10px; padding:14px; color:#aebac8; font:12.5px/1.7 'Geist Mono',monospace; outline:none; resize:vertical;"></textarea>
+      </div>
+      <div style="padding:14px 20px; border-top:1px solid #1f2c3b; display:flex; gap:8px; justify-content:flex-end; align-items:center;">
+        <span style="margin-right:auto; font-size:11px; color:#768493; font-family:'Geist Mono',monospace;">{{ promptChars }} chars</span>
+        <button onClick="{{ closePrompt }}" style="font-size:13px; color:#aebac8; background:#0e1620; border:1px solid #1f2c3b; border-radius:7px; padding:8px 14px; cursor:pointer;">Cancel</button>
+        <button onClick="{{ savePrompt }}" style="font-size:13px; color:#fff; background:#e0454a; border:0; border-radius:7px; padding:8px 16px; cursor:pointer;">Save prompt</button>
+      </div>
+    </div>
+  </div>
+</sc-if>
+
+<!-- ========= CREATE SPACE ========= -->
+<sc-if value="{{ createOpen }}">
+  <div onClick="{{ cancelCreateSpace }}" style="position:fixed; inset:0; background:rgba(2,6,11,0.65); backdrop-filter:blur(4px); display:grid; place-items:center; z-index:100; padding:20px;">
+    <div onClick="{{ stop }}" style="width:460px; max-width:100%; background:#0a1118; border:1px solid #2a3a4c; border-radius:16px; box-shadow:0 24px 64px rgba(0,0,0,0.6); overflow:hidden;">
+      <div style="padding:22px 22px 6px; display:flex; align-items:flex-start; gap:13px;">
+        <span style="width:34px;height:34px;border-radius:8px;background:rgba(224,69,74,0.13);display:grid;place-items:center;flex:0 0 auto;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#e0454a" stroke-width="1.9" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span>
+        <div style="flex:1;"><h3 style="font-size:15.5px; font-weight:600; margin:0;">New knowledge space</h3><p style="color:#768493; font-size:12.5px; margin:6px 0 0; line-height:1.55;">A space has its own private vector index, sources, and chats. Give it a name to get started.</p></div>
+      </div>
+      <div style="padding:14px 22px 4px;">
+        <input value="{{ createName }}" onInput="{{ onCreateName }}" onKeyDown="{{ onCreateKey }}" autofocus placeholder="e.g. Engineering Docs" style="width:100%; background:#070a0e; border:1px solid #2a3a4c; border-radius:10px; padding:12px 14px; color:#e8eef5; font:14px 'Geist'; outline:none;">
+      </div>
+      <div style="padding:14px 22px 18px; display:flex; gap:8px; justify-content:flex-end;">
+        <button onClick="{{ cancelCreateSpace }}" style="font-size:13px; color:#aebac8; background:#0e1620; border:1px solid #1f2c3b; border-radius:7px; padding:9px 15px; cursor:pointer;">Cancel</button>
+        <button onClick="{{ submitCreateSpace }}" style="{{ createBtnStyle }}">{{ createBtnLabel }}</button>
+      </div>
+    </div>
+  </div>
+</sc-if>
+
+<!-- ========= DELETE SPACE CONFIRM ========= -->
+<sc-if value="{{ confirmOpen }}">
+  <div onClick="{{ cancelDeleteSpace }}" style="position:fixed; inset:0; background:rgba(2,6,11,0.65); backdrop-filter:blur(4px); display:grid; place-items:center; z-index:100; padding:20px;">
+    <div onClick="{{ stop }}" style="width:440px; max-width:100%; background:#0a1118; border:1px solid #2a3a4c; border-radius:16px; box-shadow:0 24px 64px rgba(0,0,0,0.6); overflow:hidden;">
+      <div style="padding:22px 22px 16px; display:flex; align-items:flex-start; gap:13px;">
+        <span style="width:34px;height:34px;border-radius:8px;background:rgba(224,69,74,0.13);display:grid;place-items:center;flex:0 0 auto;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#e0454a" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M10 11v6M14 11v6"/></svg></span>
+        <div style="flex:1;"><h3 style="font-size:15.5px; font-weight:600; margin:0;">Delete “{{ confirmName }}”?</h3><p style="color:#768493; font-size:12.5px; margin:6px 0 0; line-height:1.55;">This permanently removes its index, every connected source, and all chats in this space. This cannot be undone.</p></div>
+      </div>
+      <div style="padding:14px 22px 18px; display:flex; gap:8px; justify-content:flex-end;">
+        <button onClick="{{ cancelDeleteSpace }}" style="font-size:13px; color:#aebac8; background:#0e1620; border:1px solid #1f2c3b; border-radius:7px; padding:9px 15px; cursor:pointer;">Cancel</button>
+        <button onClick="{{ confirmDeleteSpace }}" style="{{ confirmBtnStyle }}">{{ confirmBtnLabel }}</button>
+      </div>
+    </div>
+  </div>
+</sc-if>
+
+<!-- ========= NEW ACCOUNT / TEMP PASSWORD ========= -->
+<sc-if value="{{ inviteOpen }}">
+  <div onClick="{{ closeInvite }}" style="position:fixed; inset:0; background:rgba(2,6,11,0.65); backdrop-filter:blur(4px); display:grid; place-items:center; z-index:100; padding:20px;">
+    <div onClick="{{ stop }}" style="width:460px; max-width:100%; background:#0a1118; border:1px solid #2a3a4c; border-radius:16px; box-shadow:0 24px 64px rgba(0,0,0,0.6); overflow:hidden;">
+      <sc-if value="{{ inviteFormOpen }}">
+        <div style="padding:22px 22px 6px; display:flex; align-items:flex-start; gap:13px;">
+          <span style="width:34px;height:34px;border-radius:8px;background:rgba(224,69,74,0.13);display:grid;place-items:center;flex:0 0 auto;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#e0454a" stroke-width="1.9"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM19 8v6M22 11h-6"/></svg></span>
+          <div style="flex:1;"><h3 style="font-size:15.5px; font-weight:600; margin:0;">New account</h3><p style="color:#768493; font-size:12.5px; margin:6px 0 0; line-height:1.55;">Creates a member with a one-time temporary password. They'll set their own on first sign-in. Grant space access from the table afterward.</p></div>
+        </div>
+        <div style="padding:14px 22px 4px;">
+          <input value="{{ inviteEmail }}" onInput="{{ onInviteEmail }}" autofocus placeholder="person@team.dev" style="width:100%; background:#070a0e; border:1px solid #2a3a4c; border-radius:10px; padding:12px 14px; color:#e8eef5; font:14px 'Geist'; outline:none;">
+        </div>
+        <div style="padding:14px 22px 18px; display:flex; gap:8px; justify-content:flex-end;">
+          <button onClick="{{ closeInvite }}" style="font-size:13px; color:#aebac8; background:#0e1620; border:1px solid #1f2c3b; border-radius:7px; padding:9px 15px; cursor:pointer;">Cancel</button>
+          <button onClick="{{ submitInvite }}" style="{{ inviteBtnStyle }}">{{ inviteBtnLabel }}</button>
+        </div>
+      </sc-if>
+      <sc-if value="{{ inviteHasResult }}">
+        <div style="padding:22px 22px 6px; display:flex; align-items:flex-start; gap:13px;">
+          <span style="width:34px;height:34px;border-radius:8px;background:rgba(34,197,94,0.14);display:grid;place-items:center;flex:0 0 auto;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+          <div style="flex:1;"><h3 style="font-size:15.5px; font-weight:600; margin:0;">{{ inviteResultTitle }}</h3><p style="color:#768493; font-size:12.5px; margin:6px 0 0; line-height:1.55;">Share this one-time temporary password with <b style="color:#aebac8;">{{ inviteResultEmail }}</b> over a trusted channel. It won't be shown again.</p></div>
+        </div>
+        <div style="padding:14px 22px 4px;">
+          <div style="background:#070a0e; border:1px solid #2a3a4c; border-radius:10px; padding:13px 14px; color:#2dd4bf; font:14px 'Geist Mono',monospace; word-break:break-all; user-select:all;">{{ inviteResultPw }}</div>
+        </div>
+        <div style="padding:14px 22px 18px; display:flex; gap:8px; justify-content:flex-end;">
+          <button onClick="{{ closeInvite }}" style="font-size:13px; color:#fff; background:#e0454a; border:0; border-radius:7px; padding:9px 16px; cursor:pointer;">Done</button>
+        </div>
+      </sc-if>
+    </div>
+  </div>
+</sc-if>
+
+<!-- ========= ADD-MEMBER DRAWER (per-space access) ========= -->
+<sc-if value="{{ addDrawerOpen }}">
+  <div onClick="{{ closeAddDrawer }}" style="position:fixed; inset:0; background:rgba(2,6,11,0.55); backdrop-filter:blur(3px); z-index:120;">
+    <div onClick="{{ stop }}" style="position:absolute; top:0; right:0; height:100%; width:420px; max-width:92%; background:#0a1118; border-left:1px solid #2a3a4c; box-shadow:-24px 0 64px rgba(0,0,0,0.5); display:flex; flex-direction:column;">
+      <div style="padding:20px 22px 14px; border-bottom:1px solid #1f2c3b; display:flex; align-items:flex-start; gap:12px;">
+        <div style="flex:1;"><h3 style="font-size:15px; font-weight:600; margin:0;">Add a member · {{ accessSpaceName }}</h3><p style="color:#768493; font-size:12px; margin:4px 0 0; line-height:1.5;">Give a previously-invited account access to this space.</p></div>
+        <button onClick="{{ closeAddDrawer }}" style="width:30px;height:30px;border-radius:6px;background:transparent;border:0;color:#768493;cursor:pointer;display:grid;place-items:center;flex:0 0 auto;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+      </div>
+      <div style="flex:1; overflow-y:auto; padding:14px 18px;">
+        <sc-for list="{{ accessCandidates }}" as="a" hint-placeholder-count="3">
+          <div style="padding:11px 12px; border:1px solid #1f2c3b; border-radius:10px; margin-bottom:9px; background:#070a0e;">
+            <div style="display:flex; align-items:center; gap:10px; margin-bottom:9px;">
+              <span style="width:26px;height:26px;border-radius:50%;background:#16202c;display:grid;place-items:center;font-size:9.5px;font-weight:600;color:#aebac8;flex:0 0 auto;">{{ a.initials }}</span>
+              <span style="flex:1; min-width:0; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ a.email }}</span>
+            </div>
+            <div style="display:flex; gap:8px;">
+              <span onClick="{{ a.addChat }}" style="{{ a.addChatStyle }}">+ Chat only access</span>
+              <span onClick="{{ a.addSource }}" style="{{ a.addSourceStyle }}">+ Chat and source access</span>
+            </div>
+          </div>
+        </sc-for>
+        <sc-if value="{{ noCandidates }}">
+          <div style="padding:22px; text-align:center; color:#4d5b6b; font-size:12.5px; line-height:1.6;">No other accounts to add.<br>Invite people in <b style="color:#768493;">Members &amp; access</b>, then add them here.</div>
+        </sc-if>
+      </div>
+      <div style="padding:13px 20px; border-top:1px solid #1f2c3b; display:flex; justify-content:flex-end;">
+        <button onClick="{{ closeAddDrawer }}" style="font-size:13px; color:#aebac8; background:#0e1620; border:1px solid #1f2c3b; border-radius:7px; padding:8px 16px; cursor:pointer;">Done</button>
+      </div>
+    </div>
+  </div>
+</sc-if>
+
+<!-- ========= REMOVE-ACCESS CONFIRM ========= -->
+<sc-if value="{{ removeOpen }}">
+  <div onClick="{{ cancelRemove }}" style="position:fixed; inset:0; background:rgba(2,6,11,0.65); backdrop-filter:blur(4px); display:grid; place-items:center; z-index:130; padding:20px;">
+    <div onClick="{{ stop }}" style="width:440px; max-width:100%; background:#0a1118; border:1px solid #2a3a4c; border-radius:16px; box-shadow:0 24px 64px rgba(0,0,0,0.6); overflow:hidden;">
+      <div style="padding:22px 22px 16px; display:flex; align-items:flex-start; gap:13px;">
+        <span style="width:34px;height:34px;border-radius:8px;background:rgba(224,69,74,0.13);display:grid;place-items:center;flex:0 0 auto;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#e0454a" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></span>
+        <div style="flex:1;"><h3 style="font-size:15.5px; font-weight:600; margin:0;">Remove access?</h3><p style="color:#768493; font-size:12.5px; margin:6px 0 0; line-height:1.55;"><b style="color:#aebac8;">{{ removeEmail }}</b> will lose access to <b style="color:#aebac8;">{{ accessSpaceName }}</b>. Their chats in this space stay private to them but become unreachable until access is restored.</p></div>
+      </div>
+      <div style="padding:14px 22px 18px; display:flex; gap:8px; justify-content:flex-end;">
+        <button onClick="{{ cancelRemove }}" style="font-size:13px; color:#aebac8; background:#0e1620; border:1px solid #1f2c3b; border-radius:7px; padding:9px 15px; cursor:pointer;">Cancel</button>
+        <button onClick="{{ confirmRemove }}" style="font-size:13px; color:#fff; background:#e0454a; border:0; border-radius:7px; padding:9px 16px; cursor:pointer;">Remove access</button>
+      </div>
+    </div>
+  </div>
+</sc-if>
+
+<!-- ========= TOAST ========= -->
+<sc-if value="{{ toast }}">
+  <div style="position:fixed; bottom:20px; right:20px; z-index:200; background:#131c28; border:1px solid #38495c; border-radius:8px; padding:10px 14px 10px 11px; font-size:13px; box-shadow:0 8px 24px rgba(0,0,0,0.4); display:flex; align-items:center; gap:9px;">
+    <span style="width:22px;height:22px;border-radius:5px;background:rgba(34,197,94,0.16);color:#22c55e;display:grid;place-items:center;flex:0 0 auto;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+    <span>{{ toast }}</span>
+  </div>
+</sc-if>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:&quot;100%&quot;,&quot;height&quot;:&quot;100%&quot;}}">
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    // Provider list for the setup wizard (Ollama is the only available one in v1).
+    this.PROVIDERS = [
+      { id:'ollama', name:'Ollama', tag:'LOCAL', desc:'Run open models on your own hardware. No data leaves your network.', available:true, iconBg:'rgba(224,69,74,0.13)' },
+      { id:'anthropic', name:'Anthropic Claude', tag:'ADD LATER', desc:'Claude Sonnet & Opus via API key.', available:false, iconBg:'rgba(224,69,74,0.06)' },
+      { id:'openai', name:'OpenAI', tag:'ADD LATER', desc:'GPT-4o and o-series via API key.', available:false, iconBg:'rgba(34,197,94,0.06)' },
+      { id:'vllm', name:'vLLM endpoint', tag:'ADD LATER', desc:'Any OpenAI-compatible self-hosted endpoint.', available:false, iconBg:'rgba(96,165,250,0.06)' },
+    ];
+    // Connector kinds the backend registers (github, slack). gdoc/files are deferred.
+    this.KINDS = [
+      { id:'github', label:'GitHub', credPlaceholder:'GitHub personal access token (contents:read, issues:read)', targetPlaceholder:'owner/repo, or a /tree/<branch>/<folder> URL to scope to a folder (comma-separated)' },
+      { id:'slack', label:'Slack', credPlaceholder:'Slack bot token (channels:history, channels:read, users:read)', targetPlaceholder:'Channel IDs to ingest, comma-separated (e.g. C012AB3CD)' },
+    ];
+    // status enum → display + color
+    this.STATUS = {
+      idle:        { label:'idle',        color:'#768493' },
+      validating:  { label:'validating…', color:'#f59e0b' },
+      auth_error:  { label:'auth error',  color:'#f87171' },
+      syncing:     { label:'syncing…',    color:'#f59e0b' },
+      connected:   { label:'connected',   color:'#22c55e' },
+      partial:     { label:'partial',     color:'#f59e0b' },
+      error:       { label:'error',       color:'#f87171' },
+    };
+    this.state = {
+      // bootstrap / auth
+      ready: false,                 // /me + /settings resolved
+      stage: 'login',               // 'login' | 'changePassword' | 'setup' | 'app'
+      authMode: 'login',            // 'login' | 'register' (register only at bootstrap)
+      needsBootstrap: false,        // true until the first (owner) account exists
+      email: '', password: '',
+      authError: '', authBusy: false,
+      userEmail: '',
+      userRole: 'member',           // workspaceRole from /me: owner | admin | member
+      // forced first-login password change
+      cpCurrent: '', cpNew: '', cpConfirm: '', cpError: '', cpBusy: false,
+      // members & access (admin)
+      members: [],                  // [{id,email,workspaceRole,memberships:[{spaceId,role}]}]
+      membersBusy: false,
+      inviteOpen: false, inviteEmail: '', inviteBusy: false, inviteResult: null,
+      nudgeDismissed: false,
+      // per-space access (admin manages who can reach the current space)
+      accessSpaceId: null, accessSpaceName: '',
+      accessRoles: {},              // userId -> 'viewer'|'editor' for the open space
+      accessUsers: [],              // all users to render in the access tab
+      accessBusy: false,
+      addDrawerOpen: false,         // "add a member" drawer
+      removeTarget: null,           // {userId,email} pending remove-access confirmation
+      // setup wizard
+      setupStep: 'provider',        // 'provider' | 'connect'
+      provider: 'ollama',
+      ollamaHost: 'http://localhost:11434',
+      connState: 'idle',            // idle|testing|ok|no-models|error
+      connMessage: '',
+      connVersion: '',
+      discoveredModels: [],         // [{name, flaggedMaybeEmbedding}]
+      chatModel: '',
+      setupBusy: false,
+      // app
+      view: 'chat',
+      switchingSpace: false,        // true while a space switch is loading (skeletons, not empty flash)
+      spaces: [],                   // [{id,slug,name,customPrompt,...}]
+      spaceId: null,
+      connectorsBySpace: {},        // spaceId -> [public connector]
+      documentsBySpace: {},         // spaceId -> [indexed document]
+      convsBySpace: {},             // spaceId -> [conversation summary]
+      activeConvBySpace: {},        // spaceId -> conversationId | null
+      messages: [],                 // current conversation messages (rendered)
+      railSources: [],              // current rail cards [{id,title,snippet,score,connector}]
+      citedSet: {},                 // {n:true} validated citation numbers for last answer
+      draft: '',
+      streaming: false,
+      loading: false,               // retrieving (pre-token) phase
+      loadingLabel: '',
+      syncingSpaces: {},            // spaceId -> true while a sync runs
+      // conversation menu
+      convMenuOpen: false, convSearch: '',
+      // prompt modal
+      promptOpen: false, promptDraft: '',
+      // create-space dialog
+      createOpen: false, createName: '', createBusy: false,
+      // delete-space confirm dialog
+      confirmSpace: null, confirmBusy: false,
+      // add-connector form
+      addFormOpen: false, newKind: 'github', newCred: '', newTargets: '',
+      // file upload
+      uploadBusy: false,
+      uploadDragging: false,
+      // settings (persisted)
+      settingsModel: '',
+      toast: null,
+    };
+    // bind handlers
+    [
+      'onEmail','onPassword','onAuthKey','submitAuth','logout',
+      'onCpCurrent','onCpNew','onCpConfirm','submitChangePassword',
+      'goMembers','loadMembers','openInvite','closeInvite','onInviteEmail','submitInvite',
+      'promoteMember','demoteMember','resetMemberPw','dismissNudge',
+      'goAccess','loadAccess','openAddDrawer','closeAddDrawer','cancelRemove','confirmRemove',
+      'selectProvider','providerNext','onHost','testConn','setupBack','finishSetup','selectChatModel',
+      'createSpace','newChat','onDraft','onKey','send','stopStream',
+      'toggleConvMenu','closeConvMenu','onConvSearch',
+      'openPrompt','closePrompt','onPromptInput','savePrompt',
+      'cancelCreateSpace','onCreateName','onCreateKey','submitCreateSpace',
+      'cancelDeleteSpace','confirmDeleteSpace',
+      'goChat','goSources',
+      'openAddForm','cancelAddForm','onNewCred','onNewTargets','submitConnector',
+      'pickUploadFiles','uploadFiles','onUploadDragOver','onUploadDragLeave','onUploadDrop',
+    ].forEach(m => { this[m] = this[m].bind(this); });
+    this.stop = (e)=>{ e && e.stopPropagation && e.stopPropagation(); };
+  }
+
+  async componentDidMount() {
+    await this.bootstrap();
+  }
+
+  // ---------- API helper ----------
+  async api(path, opts={}) {
+    const res = await fetch(path, {
+      credentials: 'same-origin',
+      // Never serve API reads from the browser HTTP cache: a stale GET is why a
+      // freshly-invited member (or just-deleted space) wouldn't show on refetch.
+      cache: 'no-store',
+      headers: opts.body ? { 'content-type':'application/json' } : undefined,
+      ...opts,
+    });
+    return res;
+  }
+  async apiJson(path, opts={}) {
+    const res = await this.api(path, opts);
+    let body = null;
+    try { body = await res.json(); } catch(e) { body = null; }
+    return { ok: res.ok, status: res.status, body };
+  }
+
+  // ---------- bootstrap: /me → forced change? → /settings ----------
+  async bootstrap() {
+    const me = await this.apiJson('/api/auth/me');
+    if (!me.ok) {
+      // Not logged in. Ask whether this is a fresh workspace so the auth screen
+      // shows "create owner" (register) vs "sign in" — no user-facing toggle.
+      const bs = await this.apiJson('/api/auth/bootstrap-status');
+      const needsBootstrap = !!(bs.ok && bs.body && bs.body.needsBootstrap);
+      this.setState({ ready:true, stage:'login', needsBootstrap, authMode: needsBootstrap?'register':'login' });
+      return;
+    }
+    const user = (me.body && me.body.user) || {};
+    // A temp-password account must change it before reaching anything else (R10).
+    if (user.mustChangePassword) {
+      this.setState({ ready:true, stage:'changePassword', userEmail:user.email||'', userRole:user.workspaceRole||'member',
+        cpCurrent:'', cpNew:'', cpConfirm:'', cpError:'' });
+      return;
+    }
+    const st = await this.apiJson('/api/settings');
+    if (st.ok && st.body && st.body.isConfigured) {
+      this.setState({ ready:true, stage:'app', userEmail:user.email||'', userRole:user.workspaceRole||'member', settingsModel: st.body.chatModel || '' });
+      await this.loadSpaces();
+    } else {
+      const hostHint = (st.ok && st.body && st.body.ollamaUrl) ? st.body.ollamaUrl : this.state.ollamaHost;
+      this.setState({ ready:true, stage:'setup', setupStep:'provider', userEmail:user.email||'', userRole:user.workspaceRole||'member', ollamaHost: hostHint });
+    }
+  }
+
+  // ---------- auth ----------
+  onEmail(e){ this.setState({ email:e.target.value, authError:'' }); }
+  onPassword(e){ this.setState({ password:e.target.value, authError:'' }); }
+  onAuthKey(e){ if (e.key==='Enter') { e.preventDefault(); this.submitAuth(); } }
+  async submitAuth() {
+    if (this.state.authBusy) return;
+    const email=(this.state.email||'').trim(), password=this.state.password||'';
+    if (!email || !password) { this.setState({ authError:'Enter an email and password.' }); return; }
+    // Register is only reachable while the workspace needs its owner (bootstrap).
+    const path = (this.state.authMode==='register' && this.state.needsBootstrap) ? '/api/auth/register' : '/api/auth/login';
+    this.setState({ authBusy:true, authError:'' });
+    const r = await this.apiJson(path, { method:'POST', body: JSON.stringify({ email, password }) });
+    this.setState({ authBusy:false });
+    if (r.ok) {
+      this.setState({ password:'' });
+      await this.bootstrap();
+      return;
+    }
+    let msg = 'Sign in failed.';
+    if (r.status===429) msg = 'Too many attempts — wait a minute and try again.';
+    else if (r.status===401) msg = 'Incorrect email or password.';
+    else if (r.status===409) msg = 'That email is already registered — sign in instead.';
+    else if (r.status===403) msg = 'Sign-up is closed. Ask a workspace admin to create your account.';
+    else if (r.status===400) msg = 'Enter a valid email and a non-empty password.';
+    else if (r.body && r.body.error) msg = String(r.body.error);
+    this.setState({ authError: msg });
+  }
+  async logout() {
+    await this.api('/api/auth/logout', { method:'POST' });
+    if (this._es) { try { this._abort && this._abort.abort(); } catch(e){} }
+    this.setState({ stage:'login', authMode:'login', email:'', password:'', authError:'',
+      spaces:[], spaceId:null, messages:[], railSources:[], connectorsBySpace:{}, documentsBySpace:{}, convsBySpace:{}, activeConvBySpace:{} });
+    await this.bootstrap();
+  }
+
+  // ---------- forced first-login password change (R10) ----------
+  onCpCurrent(e){ this.setState({ cpCurrent:e.target.value, cpError:'' }); }
+  onCpNew(e){ this.setState({ cpNew:e.target.value, cpError:'' }); }
+  onCpConfirm(e){ this.setState({ cpConfirm:e.target.value, cpError:'' }); }
+  async submitChangePassword() {
+    if (this.state.cpBusy) return;
+    const { cpCurrent, cpNew, cpConfirm } = this.state;
+    if (!cpCurrent || !cpNew) { this.setState({ cpError:'Enter your temporary password and a new one.' }); return; }
+    if (cpNew.length < 8) { this.setState({ cpError:'New password must be at least 8 characters.' }); return; }
+    if (cpNew !== cpConfirm) { this.setState({ cpError:'New passwords do not match.' }); return; }
+    this.setState({ cpBusy:true, cpError:'' });
+    const r = await this.apiJson('/api/auth/change-password', { method:'POST', body: JSON.stringify({ currentPassword: cpCurrent, newPassword: cpNew }) });
+    this.setState({ cpBusy:false });
+    if (r.ok) { this.setState({ cpCurrent:'', cpNew:'', cpConfirm:'' }); await this.bootstrap(); return; }
+    this.setState({ cpError: r.status===401 ? 'Temporary password is incorrect.' : 'Could not change the password.' });
+  }
+
+  // ---------- members & access (admin) ----------
+  async goMembers(){ this.setState({ view:'members' }); await this.loadMembers(); }
+  async loadMembers(){
+    this.setState({ membersBusy:true });
+    const [m, sp] = await Promise.all([ this.apiJson('/api/members'), this.apiJson('/api/spaces') ]);
+    this.setState({ membersBusy:false, members: (m.ok && Array.isArray(m.body)) ? m.body : [],
+      spaces: (sp.ok && Array.isArray(sp.body)) ? sp.body : this.state.spaces });
+  }
+  // Cycle a member's per-space role on click: none → viewer → editor → none.
+  async cycleCell(userId, spaceId, current){
+    const next = current==='' ? 'viewer' : current==='viewer' ? 'editor' : '';
+    if (next==='') {
+      const r = await this.api('/api/members/'+userId+'/roles/'+spaceId, { method:'DELETE' });
+      if (!r.ok) { this.flash('Could not revoke access.'); return; }
+    } else {
+      const r = await this.apiJson('/api/members/'+userId+'/roles', { method:'POST', body: JSON.stringify({ spaceId, role: next }) });
+      if (!r.ok) { this.flash('Could not update the role.'); return; }
+    }
+    await this.loadMembers();
+  }
+  async promoteMember(userId){
+    const r = await this.api('/api/members/'+userId+'/promote', { method:'POST' });
+    if (!r.ok) { this.flash(r.status===403 ? 'Only the owner can promote admins.' : 'Could not promote.'); return; }
+    this.flash('Promoted to admin'); await this.loadMembers();
+  }
+  async demoteMember(userId){
+    const r = await this.api('/api/members/'+userId+'/demote', { method:'POST' });
+    if (!r.ok) { this.flash(r.status===409 ? 'Cannot remove the last admin.' : (r.status===403 ? 'That admin cannot be demoted.' : 'Could not demote.')); return; }
+    this.flash('Demoted to member'); await this.loadMembers();
+  }
+  async resetMemberPw(userId){
+    const r = await this.apiJson('/api/members/'+userId+'/reset-password', { method:'POST' });
+    if (!r.ok) { this.flash('Could not reset the password.'); return; }
+    this.setState({ inviteResult: { email: (this.state.members.find(m=>m.id===userId)||{}).email || '', tempPassword: r.body.tempPassword, reset:true }, inviteOpen:true });
+  }
+  dismissNudge(){ this.setState({ nudgeDismissed:true }); }
+  openInvite(){ this.setState({ inviteOpen:true, inviteEmail:'', inviteResult:null, inviteBusy:false }); }
+  closeInvite(){ if (this.state.inviteBusy) return; this.setState({ inviteOpen:false }); }
+  onInviteEmail(e){ this.setState({ inviteEmail:e.target.value }); }
+  async submitInvite(){
+    if (this.state.inviteBusy) return;
+    const email = (this.state.inviteEmail||'').trim();
+    if (!email) return;
+    this.setState({ inviteBusy:true });
+    const r = await this.apiJson('/api/members', { method:'POST', body: JSON.stringify({ email }) });
+    this.setState({ inviteBusy:false });
+    if (!r.ok) { this.flash(r.status===409 ? 'That email already has an account.' : 'Could not create the account.'); return; }
+    this.setState({ inviteResult: { email, tempPassword: r.body.tempPassword, reset:false } });
+    await this.loadMembers();
+  }
+
+  // ---------- per-space access (admin manages who reaches THIS space) ----------
+  // The Access tab: switch the active space's view and load its members.
+  async goAccess(spaceId){
+    const id = spaceId || this.state.spaceId;
+    const sp = this.state.spaces.find(s=>s.id===id);
+    if (!sp) return;
+    this.setState({ view:'access', accessSpaceId:sp.id, accessSpaceName:sp.name, accessRoles:{}, accessUsers:[] });
+    await this.loadAccess();
+  }
+  async loadAccess(){
+    const sid = this.state.accessSpaceId;
+    if (!sid) return;
+    this.setState({ accessBusy:true });
+    const [mem, users] = await Promise.all([
+      this.apiJson('/api/spaces/'+sid+'/members'),
+      this.apiJson('/api/members'),
+    ]);
+    const roles = {};
+    if (mem.ok && Array.isArray(mem.body)) mem.body.forEach(m=>{ roles[m.userId]=m.role; });
+    // Show everyone, including the current user. Owners/admins reach all spaces
+    // (shown as full-access, not editable); members get per-space role controls.
+    const all = (users.ok && Array.isArray(users.body) ? users.body : [])
+      .map(u=>({ id:u.id, email:u.email, workspaceRole:u.workspaceRole }));
+    this.setState({ accessBusy:false, accessRoles:roles, accessUsers:all });
+  }
+  // Set or clear a member's role on the open space ('' removes access), with a
+  // success toast so the change is confirmed.
+  async setAccess(userId, role){
+    const sid = this.state.accessSpaceId;
+    if (!sid) return;
+    const who = (this.state.accessUsers.find(u=>u.id===userId)||{}).email || 'member';
+    let r;
+    if (role==='') r = await this.api('/api/members/'+userId+'/roles/'+sid, { method:'DELETE' });
+    else r = await this.apiJson('/api/members/'+userId+'/roles', { method:'POST', body: JSON.stringify({ spaceId: sid, role }) });
+    if (!r.ok) { this.flash('Could not update access for '+who+'.'); return; }
+    await this.loadAccess();
+    await this.loadMembers();
+    const label = role==='editor' ? 'chat and source access' : 'chat only access';
+    this.flash(role==='' ? (who+' · access removed') : (who+' · '+label));
+  }
+  openAddDrawer(){ this.setState({ addDrawerOpen:true }); }
+  closeAddDrawer(){ this.setState({ addDrawerOpen:false }); }
+  askRemove(userId, email){ this.setState({ removeTarget:{ userId, email } }); }
+  cancelRemove(){ this.setState({ removeTarget:null }); }
+  async confirmRemove(){ const t=this.state.removeTarget; if(!t) return; this.setState({ removeTarget:null }); await this.setAccess(t.userId, ''); }
+
+  // ---------- setup wizard ----------
+  selectProvider(id){ const p=this.PROVIDERS.find(x=>x.id===id); if(!p||!p.available){ this.flash(p?p.name+' — coming soon':''); return; } this.setState({ provider:id }); }
+  providerNext(){ this.setState({ setupStep:'connect' }); }
+  onHost(e){ this.setState({ ollamaHost:e.target.value, connState:'idle', connMessage:'', discoveredModels:[], chatModel:'' }); }
+  setupBack(){ this.setState({ setupStep:'provider' }); }
+  selectChatModel(id){ this.setState({ chatModel:id }); }
+  async testConn() {
+    if (this.state.connState==='testing') return;
+    this.setState({ connState:'testing', connMessage:'', discoveredModels:[], chatModel:'' });
+    const r = await this.apiJson('/api/settings/test-ollama', { method:'POST', body: JSON.stringify({ url: this.state.ollamaHost }) });
+    const b = r.body || {};
+    if (r.ok && b.ok && Array.isArray(b.chatModels) && b.chatModels.length>0) {
+      const first = b.chatModels[0].name;
+      this.setState({ connState:'ok', connMessage:b.message||'', connVersion:b.version||'', discoveredModels:b.chatModels, chatModel:first });
+    } else if (r.ok && b.ok) {
+      // reachable but no usable chat models
+      this.setState({ connState:'no-models', connMessage:b.message||'Connected, but no chat models found — run `ollama pull <model>`.', discoveredModels:[] });
+    } else {
+      this.setState({ connState:'error', connMessage: (b && b.message) ? b.message : 'Could not reach Ollama.', discoveredModels:[] });
+    }
+  }
+  async finishSetup() {
+    if (this.state.connState!=='ok' || !this.state.chatModel) { this.flash('Test the connection and pick a chat model first.'); return; }
+    if (this.state.setupBusy) return;
+    this.setState({ setupBusy:true });
+    const r = await this.apiJson('/api/settings', { method:'PUT', body: JSON.stringify({ ollamaUrl: this.state.ollamaHost, chatModel: this.state.chatModel }) });
+    this.setState({ setupBusy:false });
+    if (!r.ok) { this.flash('Could not save settings — try again.'); return; }
+    this.setState({ stage:'app', settingsModel: this.state.chatModel });
+    this.flash('Connected to Ollama · '+this.state.chatModel);
+    await this.loadSpaces();
+  }
+
+  // ---------- nav persistence (survive page refresh) ----------
+  navGet(){ try { return JSON.parse(localStorage.getItem('kl.nav')||'{}'); } catch(e){ return {}; } }
+  navSave(spaceId, conv){ try { localStorage.setItem('kl.nav', JSON.stringify({ spaceId, conv })); } catch(e){} }
+
+  // ---------- spaces ----------
+  async loadSpaces() {
+    const r = await this.apiJson('/api/spaces');
+    const spaces = (r.ok && Array.isArray(r.body)) ? r.body : [];
+    let spaceId = this.state.spaceId || this.navGet().spaceId;
+    if (!spaceId || !spaces.find(s=>s.id===spaceId)) spaceId = spaces.length ? spaces[0].id : null;
+    this.setState({ spaces, spaceId });
+    if (spaceId) await this.loadSpaceData(spaceId);
+  }
+  async loadSpaceData(spaceId) {
+    const [conv, conn, docs] = await Promise.all([
+      this.apiJson('/api/spaces/'+spaceId+'/conversations'),
+      this.apiJson('/api/spaces/'+spaceId+'/connectors'),
+      this.apiJson('/api/spaces/'+spaceId+'/documents'),
+    ]);
+    const convs = (conv.ok && Array.isArray(conv.body)) ? conv.body : [];
+    const connectors = (conn.ok && Array.isArray(conn.body)) ? conn.body : [];
+    const documents = (docs.ok && Array.isArray(docs.body)) ? docs.body : [];
+    const syncing = connectors.some(c=>c.syncing);
+    const convsBySpace = { ...this.state.convsBySpace, [spaceId]: convs };
+    const connectorsBySpace = { ...this.state.connectorsBySpace, [spaceId]: connectors };
+    const documentsBySpace = { ...this.state.documentsBySpace, [spaceId]: documents };
+    const syncingSpaces = { ...this.state.syncingSpaces };
+    if (syncing) syncingSpaces[spaceId] = true; else delete syncingSpaces[spaceId];
+    // Restore the active conversation: in-memory → persisted (localStorage) →
+    // most-recent conversation. So a refresh lands back on the chat you were in.
+    let activeConv = this.state.activeConvBySpace[spaceId] || (this.navGet().conv||{})[spaceId] || null;
+    if (activeConv && !convs.find(c=>c.id===activeConv)) activeConv = null;
+    if (!activeConv && convs.length) activeConv = convs[0].id;
+    const nextActive = { ...this.state.activeConvBySpace, [spaceId]: activeConv };
+    this.setState({ convsBySpace, connectorsBySpace, documentsBySpace, syncingSpaces, activeConvBySpace: nextActive });
+    this.navSave(spaceId, nextActive);
+    if (activeConv) await this.openConversation(activeConv); else this.setState({ messages:[], railSources:[], citedSet:{} });
+  }
+  async selectSpace(id) {
+    if (id===this.state.spaceId) { this.setState({ view:'chat' }); return; }
+    this.setState({ spaceId:id, view:'chat', messages:[], railSources:[], citedSet:{}, convMenuOpen:false, addFormOpen:false, switchingSpace:true });
+    try { await this.loadSpaceData(id); }
+    finally { this.setState({ switchingSpace:false }); }
+  }
+  createSpace(){ this.setState({ createOpen:true, createName:'', createBusy:false }); }
+  cancelCreateSpace(){ if (this.state.createBusy) return; this.setState({ createOpen:false }); }
+  onCreateName(e){ this.setState({ createName: e.target.value }); }
+  onCreateKey(e){ if (e.key==='Enter') { e.preventDefault(); this.submitCreateSpace(); } }
+  async submitCreateSpace() {
+    if (this.state.createBusy) return;
+    const name = (this.state.createName || '').trim();
+    if (!name) return;
+    this.setState({ createBusy:true });
+    const r = await this.apiJson('/api/spaces', { method:'POST', body: JSON.stringify({ name }) });
+    if (!r.ok) { this.setState({ createBusy:false }); this.flash(r.status===500 ? 'Could not provision the index (is CyborgDB running?)' : 'Could not create the space.'); return; }
+    this.setState({ createOpen:false, createBusy:false });
+    this.flash('Space created · '+r.body.name);
+    await this.loadSpaces();
+    this.setState({ spaceId: r.body.id, view:'sources' });
+    await this.loadSpaceData(r.body.id);
+  }
+  askDeleteSpace(id, name){ this.setState({ confirmSpace: { id, name }, confirmBusy:false }); }
+  cancelDeleteSpace(){ if (this.state.confirmBusy) return; this.setState({ confirmSpace:null }); }
+  async confirmDeleteSpace() {
+    const target = this.state.confirmSpace;
+    if (!target || this.state.confirmBusy) return;
+    const { id, name } = target;
+    this.setState({ confirmBusy:true });
+    const r = await this.api('/api/spaces/'+id, { method:'DELETE' });
+    if (!r.ok) { this.setState({ confirmSpace:null, confirmBusy:false }); this.flash('Could not delete the space.'); return; }
+    // Remove the row and any cached per-space state optimistically so the UI
+    // updates immediately — don't rely on a refetch (which the browser may
+    // serve from cache, the cause of the "delete twice" behaviour).
+    const drop = (m)=>{ const n={ ...m }; delete n[id]; return n; };
+    const spaces = this.state.spaces.filter(s=>s.id!==id);
+    const wasActive = this.state.spaceId===id;
+    const spaceId = wasActive ? (spaces.length ? spaces[0].id : null) : this.state.spaceId;
+    this.setState({
+      spaces, confirmSpace:null, confirmBusy:false,
+      convsBySpace: drop(this.state.convsBySpace),
+      connectorsBySpace: drop(this.state.connectorsBySpace),
+      documentsBySpace: drop(this.state.documentsBySpace),
+      syncingSpaces: drop(this.state.syncingSpaces),
+      activeConvBySpace: drop(this.state.activeConvBySpace),
+      spaceId,
+      view: wasActive ? 'chat' : this.state.view,
+    });
+    this.flash('Space deleted · '+name);
+    if (wasActive && spaceId) await this.loadSpaceData(spaceId);
+    else if (wasActive) { this.navSave(null, this.state.activeConvBySpace); this.setState({ messages:[], railSources:[], citedSet:{} }); }
+  }
+
+  // ---------- conversations / chat ----------
+  parseSources(raw) {
+    if (Array.isArray(raw)) return raw;
+    if (typeof raw==='string') { try { const v=JSON.parse(raw); return Array.isArray(v)?v:[]; } catch(e){ return []; } }
+    return [];
+  }
+  async openConversation(convId) {
+    const r = await this.apiJson('/api/conversations/'+convId);
+    if (!r.ok || !r.body) { this.setState({ messages:[], railSources:[], citedSet:{} }); return; }
+    const msgs = (r.body.messages||[]).map(m => ({
+      role: m.role,
+      text: m.text,
+      sources: this.parseSources(m.sources),
+      kind: 'normal',
+    }));
+    // rail = the most recent assistant message's snapshotted sources (R30)
+    let rail = [];
+    for (let i=msgs.length-1;i>=0;i--){ if (msgs[i].role==='assistant' && msgs[i].sources.length){ rail=msgs[i].sources; break; } }
+    const sid = this.state.spaceId;
+    const nextActive = { ...this.state.activeConvBySpace, [sid]: convId };
+    this.setState({ messages: msgs, railSources: rail, citedSet:{}, activeConvBySpace: nextActive });
+    this.navSave(sid, nextActive);
+    this.scrollChatToBottom(true);
+  }
+  async selectConv(id){ this.setState({ view:'chat', convMenuOpen:false }); await this.openConversation(id); }
+  toggleConvMenu(){ this.setState({ convMenuOpen:!this.state.convMenuOpen, convSearch:'' }); }
+  closeConvMenu(){ this.setState({ convMenuOpen:false }); }
+  onConvSearch(e){ this.setState({ convSearch:e.target.value }); }
+  newChat(){
+    const sid=this.state.spaceId;
+    const nextActive = { ...this.state.activeConvBySpace, [sid]: null };
+    this.setState({ view:'chat', convMenuOpen:false, messages:[], railSources:[], citedSet:{},
+      activeConvBySpace: nextActive, draft:'' });
+    this.navSave(sid, nextActive);
+  }
+  onDraft(e){ this.setState({ draft:e.target.value }); }
+  onKey(e){ if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); this.send(); } }
+
+  // Keep the latest answer in view. `force` jumps to the bottom (new message /
+  // opening a thread); otherwise it only follows when the user is already near
+  // the bottom, so scrolling up to read history isn't yanked back down.
+  scrollChatToBottom(force){
+    requestAnimationFrame(()=>{
+      const el = document.querySelector('[data-chat-scroll]');
+      if (!el) return;
+      const nearBottom = (el.scrollHeight - el.scrollTop - el.clientHeight) < 140;
+      if (force || nearBottom) el.scrollTop = el.scrollHeight;
+    });
+  }
+
+  async ensureConversation() {
+    const sid = this.state.spaceId;
+    let convId = this.state.activeConvBySpace[sid];
+    if (convId) return convId;
+    const r = await this.apiJson('/api/spaces/'+sid+'/conversations', { method:'POST', body: JSON.stringify({}) });
+    if (!r.ok) return null;
+    convId = r.body.id;
+    const convs = [r.body, ...(this.state.convsBySpace[sid]||[])];
+    const nextActive = { ...this.state.activeConvBySpace, [sid]: convId };
+    this.setState({ convsBySpace: { ...this.state.convsBySpace, [sid]: convs }, activeConvBySpace: nextActive });
+    this.navSave(sid, nextActive);
+    return convId;
+  }
+
+  async send(arg) {
+    const text = (typeof arg==='string') ? arg : this.state.draft;
+    const q = (text||'').trim();
+    if (!q || this.state.streaming || this.state.loading) return;
+    const sid = this.state.spaceId;
+    if (!sid) return;
+    const convId = await this.ensureConversation();
+    if (!convId) { this.flash('Could not start the conversation.'); return; }
+
+    // optimistic: append user message + an empty streaming assistant message
+    const userMsg = { role:'user', text:q, sources:[], kind:'normal' };
+    const asstMsg = { role:'assistant', text:'', sources:[], kind:'normal', streaming:true };
+    this.setState({ messages:[...this.state.messages, userMsg, asstMsg], draft:'',
+      loading:true, streaming:true, loadingLabel:'searching the vector index…', railSources:[], citedSet:{} });
+    this.scrollChatToBottom(true);
+
+    const controller = new AbortController();
+    this._abort = controller;
+    let res;
+    try {
+      res = await fetch('/api/conversations/'+convId+'/messages', {
+        method:'POST', credentials:'same-origin',
+        headers:{ 'content-type':'application/json' },
+        body: JSON.stringify({ text:q }), signal: controller.signal,
+      });
+    } catch(e) {
+      this.failTurn('Could not reach the server. Your message was not sent.');
+      return;
+    }
+    if (!res.ok || !res.body) {
+      this.failTurn('The server rejected the message (status '+res.status+').');
+      return;
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let answer = '';
+    let done = false;
+    try {
+      while (!done) {
+        const { value, done:rdDone } = await reader.read();
+        if (rdDone) break;
+        buffer += decoder.decode(value, { stream:true });
+        let idx;
+        while ((idx = buffer.indexOf('\n\n')) !== -1) {
+          const frame = buffer.slice(0, idx); buffer = buffer.slice(idx+2);
+          const evt = this.parseSSE(frame);
+          if (!evt) continue;
+          if (evt.event==='sources') {
+            this.setState({ railSources: (evt.data.cards||[]), loading:false, loadingLabel:'' });
+          } else if (evt.event==='notice') {
+            this.markStreamingNotice(evt.data.message||'');
+          } else if (evt.event==='token') {
+            answer += (evt.data.value||'');
+            this.updateStreamingAnswer(answer);
+            this.setState({ loading:false });
+          } else if (evt.event==='error') {
+            this.handleStreamError(evt.data);
+            done = true; break;
+          } else if (evt.event==='done') {
+            this.finishStreamingAnswer(answer, evt.data);
+            done = true; break;
+          }
+        }
+      }
+    } catch(e) {
+      if (controller.signal.aborted) {
+        this.cancelTurn();
+      } else {
+        this.failTurn('The connection dropped mid-answer. Nothing was saved — try again.');
+      }
+      this._abort = null;
+      return;
+    }
+    if (!done) {
+      // stream ended without a done/error frame → treat as a drop
+      this.failTurn('The answer ended unexpectedly. Try again.');
+    }
+    this._abort = null;
+    // refresh the conversation list ordering
+    await this.refreshConvList();
+  }
+
+  parseSSE(frame) {
+    let event=null, dataStr='';
+    for (const line of frame.split('\n')) {
+      if (line.startsWith('event:')) event=line.slice(6).trim();
+      else if (line.startsWith('data:')) dataStr += line.slice(5).trim();
+    }
+    if (!event) return null;
+    let data={}; try { data = dataStr ? JSON.parse(dataStr) : {}; } catch(e){ data={}; }
+    return { event, data };
+  }
+  // replace the trailing (streaming) assistant message text
+  updateStreamingAnswer(answer) {
+    const msgs = this.state.messages.slice();
+    for (let i=msgs.length-1;i>=0;i--){ if (msgs[i].role==='assistant'){ msgs[i]={...msgs[i], text:answer, streaming:true}; break; } }
+    this.setState({ messages: msgs });
+    this.scrollChatToBottom();
+  }
+  // Mark the in-flight assistant bubble as an ungrounded (general-chat) answer
+  // and attach the notice text so the bubble can label itself.
+  markStreamingNotice(message) {
+    const msgs = this.state.messages.slice();
+    for (let i=msgs.length-1;i>=0;i--){ if (msgs[i].role==='assistant'){ msgs[i]={...msgs[i], notice:message, ungrounded:true}; break; } }
+    this.setState({ messages: msgs });
+  }
+  finishStreamingAnswer(answer, doneData) {
+    const cited = {}; (doneData.cited||[]).forEach(n=>{ cited[n]=true; });
+    const ungrounded = doneData.grounded===false;
+    const msgs = this.state.messages.slice();
+    for (let i=msgs.length-1;i>=0;i--){ if (msgs[i].role==='assistant'){ msgs[i]={...msgs[i], text:answer, streaming:false, sources:(doneData.cards||[]), kind: ungrounded?'ungrounded':'normal' }; break; } }
+    this.setState({ messages: msgs, streaming:false, loading:false, citedSet: cited, lastTiming: doneData.timing||null });
+    this.scrollChatToBottom();
+  }
+  handleStreamError(data) {
+    const kind = data.kind || 'error';
+    let text = data.message || 'Something went wrong.';
+    const msgs = this.state.messages.slice();
+    for (let i=msgs.length-1;i>=0;i--){
+      if (msgs[i].role==='assistant'){ msgs[i]={...msgs[i], text, streaming:false, kind: kind==='no-sources'?'no-sources':(kind==='retrieval-error'?'retrieval-error':'error'), sources:[] }; break; }
+    }
+    this.setState({ messages: msgs, streaming:false, loading:false, railSources:[] });
+    this.scrollChatToBottom();
+  }
+  failTurn(msg) {
+    // drop the optimistic streaming assistant bubble, show an error in its place
+    const msgs = this.state.messages.slice();
+    for (let i=msgs.length-1;i>=0;i--){ if (msgs[i].role==='assistant'){ msgs[i]={...msgs[i], text:msg, streaming:false, kind:'error', sources:[] }; break; } }
+    this.setState({ messages: msgs, streaming:false, loading:false });
+  }
+  cancelTurn() {
+    const msgs = this.state.messages.slice();
+    for (let i=msgs.length-1;i>=0;i--){ if (msgs[i].role==='assistant'){ msgs[i]={...msgs[i], text:'Generation stopped. The partial answer was not saved — send again to retry.', streaming:false, kind:'error', sources:[] }; break; } }
+    this.setState({ messages: msgs, streaming:false, loading:false });
+  }
+  stopStream() { if (this._abort) { try { this._abort.abort(); } catch(e){} } }
+  async refreshConvList() {
+    const sid = this.state.spaceId; if (!sid) return;
+    const r = await this.apiJson('/api/spaces/'+sid+'/conversations');
+    if (r.ok && Array.isArray(r.body)) this.setState({ convsBySpace: { ...this.state.convsBySpace, [sid]: r.body } });
+  }
+
+  // ---------- prompt modal ----------
+  openPrompt(){ const sp=this.currentSpace(); this.setState({ promptOpen:true, promptDraft: sp ? (sp.customPrompt||'') : '' }); }
+  closePrompt(){ this.setState({ promptOpen:false }); }
+  onPromptInput(e){ this.setState({ promptDraft:e.target.value }); }
+  async savePrompt(){
+    const sid=this.state.spaceId; if(!sid){ this.setState({ promptOpen:false }); return; }
+    const r = await this.apiJson('/api/spaces/'+sid+'/prompt', { method:'PUT', body: JSON.stringify({ prompt: this.state.promptDraft }) });
+    if (r.ok) {
+      const spaces = this.state.spaces.map(s=> s.id===sid ? { ...s, customPrompt: this.state.promptDraft } : s);
+      this.setState({ spaces, promptOpen:false }); this.flash('Custom prompt saved');
+    } else { this.flash('Could not save the prompt.'); }
+  }
+
+  // ---------- connectors ----------
+  openAddForm(){ this.setState({ addFormOpen:true, newKind:'github', newCred:'', newTargets:'' }); }
+  cancelAddForm(){ this.setState({ addFormOpen:false, newCred:'', newTargets:'' }); }
+  selectKind(id){ this.setState({ newKind:id }); }
+  onNewCred(e){ this.setState({ newCred:e.target.value }); }
+  onNewTargets(e){ this.setState({ newTargets:e.target.value }); }
+  async submitConnector(){
+    const sid=this.state.spaceId; if(!sid) return;
+    if (!this.state.newCred.trim()) { this.flash('Enter the connector credentials first.'); return; }
+    // owner/repo (github) or channel ids (slack), comma-separated → string[].
+    const targets = (this.state.newTargets||'').split(',').map(s=>s.trim()).filter(Boolean);
+    const r = await this.apiJson('/api/spaces/'+sid+'/connectors', { method:'POST',
+      body: JSON.stringify({ kind:this.state.newKind, credentials:this.state.newCred, targets }) });
+    if (!r.ok) { this.flash('Could not add the connector.'); return; }
+    this.setState({ addFormOpen:false, newCred:'', newTargets:'' });
+    this.flash('Connector added — validate then sync.');
+    await this.reloadConnectors();
+  }
+  async reloadConnectors(){
+    const sid=this.state.spaceId; if(!sid) return;
+    const [r, d] = await Promise.all([
+      this.apiJson('/api/spaces/'+sid+'/connectors'),
+      this.apiJson('/api/spaces/'+sid+'/documents'),
+    ]);
+    if (r.ok && Array.isArray(r.body)) {
+      const syncing = r.body.some(c=>c.syncing);
+      const syncingSpaces = { ...this.state.syncingSpaces };
+      if (syncing) syncingSpaces[sid]=true; else delete syncingSpaces[sid];
+      this.setState({ connectorsBySpace: { ...this.state.connectorsBySpace, [sid]: r.body }, syncingSpaces });
+    }
+    if (d.ok && Array.isArray(d.body)) {
+      this.setState({ documentsBySpace: { ...this.state.documentsBySpace, [sid]: d.body } });
+    }
+  }
+  async validateConnector(id){
+    const r = await this.apiJson('/api/connectors/'+id+'/validate', { method:'POST', body: JSON.stringify({}) });
+    if (r.ok && r.body && r.body.ok) {
+      this.flash(r.body.scopeWarning ? ('Valid · '+r.body.scopeWarning) : 'Credentials valid.');
+    } else {
+      this.flash((r.body && r.body.message) ? r.body.message : 'Validation failed — check the token.');
+    }
+    await this.reloadConnectors();
+  }
+  async syncConnector(id){
+    const sid=this.state.spaceId;
+    this.setState({ syncingSpaces: { ...this.state.syncingSpaces, [sid]: true } });
+    await this.reloadConnectors();
+    // The sync POST blocks until the whole sync finishes, so poll the connector
+    // row meanwhile — the backend heartbeats live progress into its `detail`.
+    const poll = setInterval(()=>{ this.refreshConnectors(sid); }, 1500);
+    let r;
+    try {
+      r = await this.apiJson('/api/connectors/'+id+'/sync', { method:'POST', body: JSON.stringify({}) });
+    } finally {
+      clearInterval(poll);
+    }
+    if (r.status===409) { this.flash('A sync is already in progress for this space.'); }
+    else if (!r.ok) { this.flash('Sync failed.'); }
+    else {
+      const b = r.body || {};
+      this.flash('Sync '+(b.status||'done')+' · '+(b.chunkCount||0)+' chunks'+(b.purged?(' · purged '+b.purged):''));
+    }
+    const syncingSpaces = { ...this.state.syncingSpaces }; delete syncingSpaces[sid];
+    this.setState({ syncingSpaces });
+    await this.reloadConnectors();
+  }
+  // Lightweight connectors-only refresh used by the sync progress poller.
+  async refreshConnectors(sid){
+    const r = await this.apiJson('/api/spaces/'+sid+'/connectors');
+    if (r.ok && Array.isArray(r.body)) {
+      this.setState({ connectorsBySpace: { ...this.state.connectorsBySpace, [sid]: r.body } });
+    }
+  }
+  async removeConnector(id){
+    const r = await this.api('/api/connectors/'+id, { method:'DELETE' });
+    if (r.ok) { this.flash('Connector removed.'); await this.reloadConnectors(); }
+    else { this.flash('Could not remove the connector.'); }
+  }
+
+  // ---------- file uploads ----------
+  // Trigger a hidden multi-file picker; on selection, POST the files as
+  // multipart FormData (field name "files") and refresh the connectors list so
+  // the "upload" connector shows with its chunk count.
+  pickUploadFiles(){
+    if (this.state.uploadBusy || !this.state.spaceId) return;
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.multiple = true;
+    input.accept = '.txt,.md,.markdown,.csv,.json,.log,.yaml,.yml,.html,.css,.ts,.tsx,.js,.jsx,.py,.go,.java,.rb,.rs,.c,.cpp,.h,.sh,text/*';
+    input.onchange = () => { this.uploadFiles(input.files); };
+    input.click();
+  }
+  // Drag-and-drop onto the upload zone (reuses uploadFiles).
+  onUploadDragOver(e){ if (this.state.uploadBusy) return; e.preventDefault(); if (!this.state.uploadDragging) this.setState({ uploadDragging:true }); }
+  onUploadDragLeave(e){ e.preventDefault(); if (this.state.uploadDragging) this.setState({ uploadDragging:false }); }
+  onUploadDrop(e){
+    e.preventDefault();
+    this.setState({ uploadDragging:false });
+    if (this.state.uploadBusy || !this.state.spaceId) return;
+    const files = e.dataTransfer && e.dataTransfer.files;
+    if (files && files.length) this.uploadFiles(files);
+  }
+  async uploadFiles(fileList){
+    const sid = this.state.spaceId;
+    if (!sid || !fileList || fileList.length===0) return;
+    const fd = new FormData();
+    for (const f of fileList) fd.append('files', f, f.name);
+    this.setState({ uploadBusy:true });
+    let res;
+    try {
+      res = await fetch('/api/spaces/'+sid+'/upload', { method:'POST', credentials:'same-origin', body: fd });
+    } catch(e) {
+      this.setState({ uploadBusy:false }); this.flash('Upload failed — try again.'); return;
+    }
+    this.setState({ uploadBusy:false });
+    if (res.status===409) { this.flash('A sync is in progress — try again.'); return; }
+    let body = null; try { body = await res.json(); } catch(e) {}
+    if (!res.ok) { this.flash((body && body.error) ? body.error : 'Upload failed — check the file type.'); return; }
+    const n = body && Array.isArray(body.files) ? body.files.length : 0;
+    const chunks = body ? (body.totalChunks||0) : 0;
+    this.flash('Uploaded '+n+' file'+(n===1?'':'s')+' · '+chunks+' chunks indexed');
+    await this.reloadConnectors();
+  }
+
+  // ---------- misc ----------
+  go(view){ this.setState({ view }); }
+  goChat(){ this.setState({ view:'chat' }); }
+  goSources(){ this.setState({ view:'sources' }); }
+  currentSpace(){ return this.state.spaces.find(s=>s.id===this.state.spaceId) || null; }
+  flash(msg){ this.setState({ toast: msg }); clearTimeout(this._t); this._t=setTimeout(()=>this.setState({ toast:null }), 2600); }
+  fmtTime(ts){ const t=typeof ts==='string'?Date.parse(ts):ts; const d=(Date.now()-t)/1000; if(isNaN(d))return ''; if(d<60)return 'just now'; if(d<3600)return Math.max(1,Math.floor(d/60))+'m ago'; if(d<86400)return Math.floor(d/3600)+'h ago'; if(d<172800)return 'yesterday'; return Math.floor(d/86400)+'d ago'; }
+
+  // similarity (0..1) → score color bands (replaces hardcoded 0.85/0.78, KTD8)
+  scoreColor(sim){ return sim>=0.6?'#22c55e':(sim>=0.45?'#f59e0b':'#768493'); }
+  barColor(sim){ return sim>=0.6?'#22c55e':(sim>=0.45?'#f59e0b':'#38495c'); }
+
+  // split assistant text into text/citation segments; validate against citedSet
+  // Split assistant text into renderable segments: fenced code blocks (```),
+  // inline `code`, [n] citations, and plain text. A fence without a closing ```
+  // (mid-stream) stays plain text until it completes, then snaps into a block.
+  splitSeg(text, citedSet, validated){
+    const out=[];
+    const fence=/```[ \t]*([A-Za-z0-9_+-]*)[ \t]*\n?([\s\S]*?)```/g;
+    let last=0, fm;
+    while((fm=fence.exec(text))){
+      if(fm.index>last) this._inlineSeg(text.slice(last,fm.index), citedSet, validated, out);
+      const code = fm[2].replace(/\n$/,'');
+      out.push(this._seg({ isCodeBlock:true, v: code, lang: fm[1]||'', copy: ()=>this.copyCode(code) }));
+      last=fm.index+fm[0].length;
+    }
+    if(last<text.length) this._inlineSeg(text.slice(last), citedSet, validated, out);
+    return out;
+  }
+  // Normalize a segment so every flag the template checks is always defined.
+  _seg(o){ return Object.assign({ isText:false, isCite:false, isCodeBlock:false, isInlineCode:false, v:'', lang:'', copy:null }, o); }
+  copyCode(text){
+    try {
+      navigator.clipboard.writeText(text);
+      this.flash('Copied to clipboard');
+    } catch(e) { this.flash('Copy failed — select and copy manually'); }
+  }
+  fmtMs(ms){ ms=Math.max(0,Math.round(ms||0)); return ms<1000 ? ms+'ms' : (ms/1000).toFixed(ms<10000?2:1)+'s'; }
+  // Build the per-reply timing breakdown (bar segments + label) from a done.timing.
+  timingView(tm){
+    const tot=Math.max((tm.totalMs||0),1);
+    const phases=[
+      { label:'CyborgDB retrieval', ms:tm.retrievalMs||0, color:'#2dd4bf' },
+      { label:'model',     ms:tm.firstTokenMs||0, color:'#f59e0b' },
+      { label:'generation',ms:tm.genMs||0, color:'#e0454a' },
+    ];
+    const known=phases.reduce((a,p)=>a+p.ms,0);
+    const other=Math.max(0, tot-known);
+    if(other>0) phases.push({ label:'other', ms:other, color:'#2a3a4c' });
+    return {
+      bar: phases.map(p=>({ color:p.color, width:Math.max(1,(p.ms/tot)*100)+'%', title:p.label+' '+this.fmtMs(p.ms) })),
+      label: this.fmtMs(tm.totalMs)+' total · CyborgDB retrieval '+this.fmtMs(tm.retrievalMs)+' · model '+this.fmtMs(tm.firstTokenMs)+' · gen '+this.fmtMs(tm.genMs),
+    };
+  }
+  _inlineSeg(text, citedSet, validated, out){
+    const ic=/`([^`\n]+)`/g; let last=0, im;
+    while((im=ic.exec(text))){
+      if(im.index>last) this._citeSeg(text.slice(last,im.index), citedSet, validated, out);
+      out.push(this._seg({ isInlineCode:true, v: im[1] }));
+      last=im.index+im[0].length;
+    }
+    if(last<text.length) this._citeSeg(text.slice(last), citedSet, validated, out);
+  }
+  _citeSeg(text, citedSet, validated, out){
+    const re=/\[(\d+)\]/g; let last=0, m;
+    while((m=re.exec(text))){
+      if(m.index>last) out.push(this._seg({ isText:true, v:text.slice(last,m.index) }));
+      const n = parseInt(m[1],10);
+      const linked = !validated || (citedSet && citedSet[n]);
+      out.push(this._seg({ isCite:true, v:m[1], color: linked?'#e0454a':'#4d5b6b', cursor: linked?'pointer':'default' }));
+      last=m.index+m[0].length;
+    }
+    if(last<text.length) out.push(this._seg({ isText:true, v:text.slice(last) }));
+  }
+
+  navStyle(active){
+    const base='display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:6px;font:13px "Geist";cursor:pointer;border:0;width:100%;text-align:left;background:transparent;';
+    return active ? base+'background:rgba(224,69,74,0.13);color:#e0454a;' : base+'color:#aebac8;';
+  }
+
+  renderVals() {
+    const s = this.state;
+
+    // ===== auth / setup =====
+    const glyphFor = (id)=>{
+      if(id==='ollama') return React.createElement('svg',{width:20,height:20,viewBox:'0 0 24 24',fill:'none',stroke:'#e0454a',strokeWidth:1.7},React.createElement('rect',{x:4,y:9,width:16,height:11,rx:3}),React.createElement('path',{d:'M8 9V6a4 4 0 0 1 8 0v3'}),React.createElement('circle',{cx:9,cy:14,r:1,fill:'#e0454a'}),React.createElement('circle',{cx:15,cy:14,r:1,fill:'#e0454a'}));
+      if(id==='anthropic') return React.createElement('span',{style:{fontFamily:'Geist Mono,monospace',fontSize:'17px',color:'#d97757'}},'*');
+      if(id==='openai') return React.createElement('svg',{width:19,height:19,viewBox:'0 0 24 24',fill:'none',stroke:'#22c55e',strokeWidth:1.5},React.createElement('path',{d:'M12 2a4 4 0 0 1 3.5 6 4 4 0 0 1-.5 7.5A4 4 0 0 1 8.5 18 4 4 0 0 1 9 10.5 4 4 0 0 1 12 2Z'}));
+      return React.createElement('svg',{width:19,height:19,viewBox:'0 0 24 24',fill:'none',stroke:'#60a5fa',strokeWidth:1.7},React.createElement('path',{d:'M4 17l6-6-6-6M12 19h8'}));
+    };
+    const providers = this.PROVIDERS.map(p=>{
+      const selected = p.available && s.provider===p.id;
+      const cardStyle = 'display:flex; align-items:center; gap:13px; width:100%; border-radius:11px; padding:14px; cursor:'+(p.available?'pointer':'not-allowed')+'; '+(selected?'background:rgba(224,69,74,0.08); border:1px solid rgba(224,69,74,0.45);':'background:#0a1118; border:1px solid #1f2c3b;')+(p.available?'':'opacity:0.55;');
+      const tagStyle = p.available
+        ? 'font-size:9px; letter-spacing:0.08em; font-family:\'Geist Mono\',monospace; color:#22c55e; border:1px solid rgba(34,197,94,0.3); background:rgba(34,197,94,0.1); border-radius:999px; padding:1px 7px;'
+        : 'font-size:9px; letter-spacing:0.08em; font-family:\'Geist Mono\',monospace; color:#768493; border:1px solid #38495c; border-radius:999px; padding:1px 7px;';
+      return { id:p.id, name:p.name, desc:p.desc, tag:p.tag, tagStyle, cardStyle, iconBg:p.iconBg, glyph:glyphFor(p.id), selected, select:()=>this.selectProvider(p.id) };
+    });
+
+    const connTesting = s.connState==='testing';
+    const connOk = s.connState==='ok';
+    const connNoModels = s.connState==='no-models';
+    const connError = s.connState==='error';
+    const chatModels = (s.discoveredModels||[]).map(m=>({
+      id:m.name, flagged:!!m.flaggedMaybeEmbedding, selected:s.chatModel===m.name, select:()=>this.selectChatModel(m.name),
+      style:'display:flex; align-items:center; gap:10px; width:100%; border-radius:8px; padding:10px 12px; cursor:pointer; '+(s.chatModel===m.name?'background:rgba(224,69,74,0.08); border:1px solid rgba(224,69,74,0.45);':'background:#0e1620; border:1px solid #1f2c3b;') }));
+    const testBtnLabel = connTesting?'Testing…':(connOk?'Connected':'Test connection');
+    const testBtnStyle = 'flex:0 0 auto; border-radius:9px; padding:11px 15px; font:500 12.5px \'Geist\'; cursor:'+(connTesting?'default':'pointer')+'; '+(connOk?'background:rgba(34,197,94,0.12); color:#22c55e; border:1px solid rgba(34,197,94,0.3);':'background:#0e1620; color:#e8eef5; border:1px solid #2a3a4c;')+(connTesting?'opacity:0.7;':'');
+    const finishReady = connOk && !!s.chatModel;
+    const finishBtnStyle = 'flex:1; border:0; border-radius:9px; padding:12px; font:600 13.5px \'Geist\'; cursor:'+(finishReady?'pointer':'not-allowed')+'; '+(finishReady?'background:#e0454a; color:#fff;':'background:#1a2532; color:#4d5b6b;');
+    const showDockerHint = connError && /localhost|127\.0\.0\.1/.test(s.ollamaHost||'');
+    const connOkLine = 'connected'+(s.connVersion?(' · Ollama '+s.connVersion):'')+' · '+(s.discoveredModels.length)+' chat model'+(s.discoveredModels.length===1?'':'s');
+
+    // ===== app data =====
+    const space = this.currentSpace();
+    const sid = s.spaceId;
+    const meta = space || { name:'', color:'#e0454a' };
+    const connectorsRaw = (s.connectorsBySpace[sid]||[]);
+    const convs = (s.convsBySpace[sid]||[]).slice().sort((a,b)=>Date.parse(b.updatedAt)-Date.parse(a.updatedAt));
+    const activeConvId = s.activeConvBySpace[sid] || null;
+    const isSyncing = !!s.syncingSpaces[sid];
+    const spaceColor = '#e0454a';
+
+    // spaces list. The active space "unrolls" its Chats/Sources sub-nav inline
+    // (always rendered; .open toggles a CSS height/opacity transition both ways).
+    const subBtn = (on)=>'display:flex;align-items:center;gap:9px;padding:6px 10px;border-radius:6px;font:12.5px "Geist";cursor:pointer;border:0;width:100%;text-align:left;background:'+(on?'rgba(224,69,74,0.13)':'transparent')+';color:'+(on?'#e0454a':'#9aa7b5')+';';
+    const spaceList = s.spaces.map(sp=>{
+      const active = sp.id===sid;
+      const chunkTotal = active ? connectorsRaw.reduce((a,c)=>a+(c.chunkCount||0),0) : '';
+      const onChat = active && s.view==='chat';
+      const onSources = active && s.view==='sources';
+      const onAccess = active && s.view==='access';
+      return { id:sp.id, name:sp.name, count: active && chunkTotal ? String(chunkTotal) : '',
+        subnavClass: active ? 'kl-subnav open' : 'kl-subnav',
+        select:()=>this.selectSpace(sp.id),
+        del:(e)=>{ if(e&&e.stopPropagation)e.stopPropagation(); this.askDeleteSpace(sp.id, sp.name); },
+        goChat:()=>this.setState({ view:'chat' }), goSources:()=>this.setState({ view:'sources' }),
+        goAccess:()=>this.goAccess(sp.id),
+        rowStyle:'display:flex;align-items:center;gap:9px;padding:7px 10px;border-radius:6px;font-size:13px;cursor:pointer;'+(active?'background:rgba(224,69,74,0.13);color:#e0454a;':'color:#aebac8;background:transparent;'),
+        dotStyle:'width:8px;height:8px;border-radius:50%;flex:0 0 auto;background:'+spaceColor+';'+(active?'box-shadow:0 0 0 3px rgba(224,69,74,0.18);':''),
+        countStyle:'margin-left:auto;font-size:11px;font-family:\'Geist Mono\',monospace;color:'+(active?'#768493':'#4d5b6b')+';',
+        delStyle:'flex:0 0 auto;width:18px;height:18px;padding:0;border-radius:4px;background:transparent;border:0;color:'+(active?'#c98a8c':'#4d5b6b')+';cursor:pointer;display:grid;place-items:center;',
+        chatStyle: subBtn(onChat), sourcesStyle: subBtn(onSources), accessStyle: subBtn(onAccess),
+        chatIcon: onChat?'#e0454a':'#768493', sourcesIcon: onSources?'#e0454a':'#768493', accessIcon: onAccess?'#e0454a':'#768493',
+        showAccess: s.userRole==='owner' || s.userRole==='admin',
+        sourceCount: active ? String(connectorsRaw.length) : '',
+        srcCountStyle:'margin-left:auto;font-size:11px;font-family:\'Geist Mono\',monospace;color:#4d5b6b;' };
+    });
+
+    // connectors (sources view)
+    const connectors = connectorsRaw.map(c=>{
+      const st = this.STATUS[c.status] || this.STATUS.idle;
+      let targetResults = [];
+      let detailLine = '';
+      let progress = null;
+      try {
+        const parsed = c.detail ? JSON.parse(c.detail) : null;
+        if (parsed && Array.isArray(parsed.targets)) {
+          targetResults = parsed.targets.map(t=>({ targetId:t.targetId, color: t.ok?'#22c55e':'#f87171',
+            detail: (t.ok?('synced '+t.chunks+' chunks'):('failed: '+(t.message||'error'))) }));
+        }
+        if (parsed && parsed.progress) progress = parsed.progress;
+      } catch(e) { detailLine = c.detail || ''; }
+      const cnt = (c.chunkCount||0);
+      const targets = Array.isArray(c.targets) ? c.targets : [];
+      const isUpload = c.kind==='upload';
+      const summary = isUpload
+        ? ((cnt? (cnt+' chunks'):'no files yet') + ' · uploaded text/markdown/code')
+        : ((cnt? (cnt+' chunks'):'no chunks yet') + (targets.length? (' · '+targets.length+' target'+(targets.length===1?'':'s')) : '') + (c.credentials && c.credentials.set ? (' · token ••'+(c.credentials.last4||'')) : ' · no token'));
+      // While syncing, show the live heartbeat in place of the static summary.
+      let progressLine = '';
+      if (progress) {
+        if (progress.phase==='pulling') {
+          progressLine = 'Pulling… '+(progress.chunks||0)+' chunks'
+            + (progress.target ? (' · '+progress.target+((progress.targetTotal>1)?(' ('+(progress.targetIndex||'?')+'/'+progress.targetTotal+')'):'')) : '');
+        } else if (progress.phase==='embedding') {
+          progressLine = 'Embedding '+(progress.chunks||0)+' chunks…';
+        } else if (progress.phase==='finishing') {
+          progressLine = 'Finishing up…';
+        }
+      }
+      const syncing = c.status==='syncing';
+      const syncDisabled = isSyncing || syncing;
+      return {
+        id:c.id, name: c.kind==='github'?'GitHub':(c.kind==='slack'?'Slack':(isUpload?'Uploaded files':c.kind)),
+        isGithub:c.kind==='github', isSlack:c.kind==='slack', isUpload,
+        hasActions: !isUpload,
+        detail: (syncing && progressLine) ? progressLine : summary, statusLabel: st.label, color: st.color,
+        showPartial: c.status==='partial' && targetResults.length>0,
+        targetResults,
+        validate:()=>this.validateConnector(c.id),
+        sync:()=>this.syncConnector(c.id),
+        remove:()=>this.removeConnector(c.id),
+        syncDisabled,
+        syncTooltip: syncDisabled ? 'A sync is in progress for this space' : 'Pull targets and ingest',
+        syncLabel: c.status==='syncing'?'Syncing…':'Sync',
+        syncBtnStyle: 'font-size:11px; border-radius:6px; padding:5px 12px; cursor:'+(syncDisabled?'not-allowed':'pointer')+'; '+(syncDisabled?'background:#131c28;color:#4d5b6b;border:1px solid #1f2c3b;':'background:rgba(224,69,74,0.12);color:#e0454a;border:1px solid rgba(224,69,74,0.3);'),
+      };
+    });
+    const kindOptions = this.KINDS.map(k=>({ id:k.id, label:k.label, select:()=>this.selectKind(k.id),
+      style:'flex:1; font-size:12px; border-radius:7px; padding:8px; cursor:pointer; '+(s.newKind===k.id?'background:rgba(224,69,74,0.1);color:#e0454a;border:1px solid rgba(224,69,74,0.4);':'background:#0e1620;color:#aebac8;border:1px solid #1f2c3b;') }));
+    const selectedKind = this.KINDS.find(k=>k.id===s.newKind)||{};
+    const credPlaceholder = selectedKind.credPlaceholder || 'credentials';
+    const targetPlaceholder = selectedKind.targetPlaceholder || '';
+    const showTargetInput = !!selectedKind.targetPlaceholder;
+    const totalChunks = connectorsRaw.reduce((a,c)=>a+(c.chunkCount||0),0);
+
+    // conversation history menu
+    const MENU_CAP = 8;
+    const query = (s.convSearch||'').trim().toLowerCase();
+    const filtered = query ? convs.filter(c=>(c.title||'').toLowerCase().includes(query)) : convs;
+    const capped = filtered.slice(0, MENU_CAP);
+    const convList = capped.map(c=>{
+      const active = c.id===activeConvId;
+      return { id:c.id, title:c.title||'New chat', time:this.fmtTime(c.updatedAt), pick:()=>this.selectConv(c.id),
+        menuStyle:'display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:7px;cursor:pointer;border:0;width:100%;text-align:left;'+(active?'background:#131c28;':'background:transparent;'),
+        titleColor: active?'#e8eef5':'#aebac8' };
+    });
+    const cur = convs.find(c=>c.id===activeConvId) || null;
+
+    // messages render
+    const msgs = s.messages.map(m=>{
+      if (m.role==='user') return { isUser:true, isAssistant:false, text:m.text };
+      const isError = m.kind==='retrieval-error' || m.kind==='error';
+      const isUngrounded = m.kind==='ungrounded' || !!m.ungrounded;
+      const srcs = m.sources||[];
+      const validated = !m.streaming && m.kind==='normal';
+      const errIcon = m.kind==='retrieval-error' ? '#f87171' : (m.kind==='no-sources' ? '#f59e0b' : '#f87171');
+      const avgScore = srcs.length ? (srcs.reduce((a,x)=>a+(x.score||0),0)/srcs.length) : 0;
+      return {
+        isUser:false, isAssistant:true,
+        isError, isAnswer: !isError, isUngrounded,
+        noticeLine: m.notice || 'Answered from general knowledge — no matching sources in this space.',
+        kind: m.kind, text: m.text, streaming: !!m.streaming,
+        segments: this.splitSeg(m.text||'', s.citedSet, validated),
+        hasSources: !isError && srcs.length>0 && !m.streaming,
+        sourceLine: srcs.length+' source'+(srcs.length===1?'':'s')+' · '+avgScore.toFixed(2)+' avg score',
+        textColor: isError ? '#cbd5e1' : '#aebac8',
+        avatarStyle: 'width:28px;height:28px;border-radius:7px;display:grid;place-items:center;flex:0 0 auto;'+(isError?'background:rgba(248,113,113,0.10);border:1px dashed rgba(248,113,113,0.35);':'background:rgba(224,69,74,0.13);border:1px dashed rgba(224,69,74,0.36);'),
+        avatarStroke: isError ? '#f87171' : '#e0454a',
+        errIcon,
+      };
+    });
+
+    // rail
+    const railSources = (s.railSources||[]).map((x,i)=>{
+      const sim = typeof x.score==='number' ? x.score : 0;
+      const pct = Math.max(2, Math.round(sim*100));
+      return { id:x.id, n:i+1, title:x.title||'(untitled)', snippet:x.snippet||'',
+        isGithub:x.connector==='github', isSlack:x.connector==='slack', isGdoc:x.connector==='gdoc', isUpload:x.connector==='upload',
+        score: sim.toFixed(2), barPct: pct+'%',
+        scoreColor: this.scoreColor(sim), barColor: this.barColor(sim) };
+    });
+
+    const hasConnectors = connectorsRaw.length>0;
+    // documents indexed in this space (files in context)
+    const docTag = { github:{label:'GitHub',color:'#22c55e'}, slack:{label:'Slack',color:'#a78bfa'}, upload:{label:'File',color:'#60a5fa'} };
+    const spaceDocs = ((s.documentsBySpace&&s.documentsBySpace[sid])||[]).map(d=>{
+      const t = docTag[d.connector] || { label:d.connector||'doc', color:'#768493' };
+      return { title:d.title, tag:t.label, tagColor:t.color, chunkLabel:(d.chunks||0)+' chunk'+((d.chunks===1)?'':'s') };
+    });
+    const hasActiveSpace = !!space;
+    const showEmpty = msgs.length===0 && !s.loading && !s.streaming && !s.switchingSpace && hasConnectors;
+    const showNoConnectors = msgs.length===0 && !s.loading && !s.streaming && !s.switchingSpace && hasActiveSpace && !hasConnectors;
+    const lastTV = (s.lastTiming && !s.streaming) ? this.timingView(s.lastTiming) : null;
+
+    // --- members & access view model (admin only) ---
+    const canManageMembers = s.userRole==='owner' || s.userRole==='admin';
+    const isOwner = s.userRole==='owner';
+    const GRADS = ['linear-gradient(135deg,#fb7185,#f59e0b)','linear-gradient(135deg,#60a5fa,#a78bfa)','linear-gradient(135deg,#2dd4bf,#60a5fa)','linear-gradient(135deg,#f59e0b,#ef4444)'];
+    const wsBadgeStyle = (ws)=>{
+      const c = ws==='owner' ? '#a78bfa' : ws==='admin' ? '#60a5fa' : '#768493';
+      return 'display:inline-block;font-size:10px;font-family:\'Geist Mono\',monospace;color:'+c+';border:1px solid '+c+'44;background:'+c+'1a;border-radius:999px;padding:2px 9px;text-transform:uppercase;';
+    };
+    const cellStyle = (role)=>{
+      const on = role==='editor' ? '#2dd4bf' : role==='viewer' ? '#768493' : '';
+      const base = 'display:inline-block;min-width:62px;font-size:11px;font-family:\'Geist Mono\',monospace;border-radius:999px;padding:3px 0;cursor:pointer;text-transform:uppercase;';
+      if (!on) return base+'color:#4d5b6b;border:1px dashed #2a3a4c;';
+      return base+'color:'+on+';border:1px solid '+on+'44;background:'+on+'1a;';
+    };
+    const matrixSpaces = s.spaces.map(sp => ({ id:sp.id, name:sp.name, color:'#e0454a' }));
+    const matrixRows = s.members.map((mem, i) => {
+      const ws = mem.workspaceRole || 'member';
+      const isWsAdmin = ws==='owner' || ws==='admin';
+      const nSpaces = (mem.memberships||[]).length;
+      return {
+        id:mem.id, email:mem.email, name:(mem.email||'').split('@')[0], initials:(mem.email||'?').slice(0,2).toUpperCase(),
+        grad: GRADS[i % GRADS.length], wsLabel: ws, wsStyle: wsBadgeStyle(ws),
+        // Per-space access is managed inside each space, so here just summarize.
+        spacesLabel: isWsAdmin ? 'all spaces' : (nSpaces===0 ? 'no spaces' : (nSpaces+(nSpaces===1?' space':' spaces'))),
+        canPromote: isOwner && ws==='member', canDemote: isOwner && ws==='admin',
+        promote: ()=>this.promoteMember(mem.id), demote: ()=>this.demoteMember(mem.id), reset: ()=>this.resetMemberPw(mem.id),
+        pending: !!mem.mustChangePassword,
+      };
+    });
+    const adminCount = s.members.filter(m=>m.workspaceRole==='owner'||m.workspaceRole==='admin').length;
+
+    // Per-space access modal rows: each member user with a None/Viewer/Editor pill.
+    // Segmented control: two joined cells (Chat only | Source management).
+    const seg = (active, color, pos) => {
+      const radius = pos==='l' ? 'border-radius:7px 0 0 7px;' : 'border-radius:0 7px 7px 0;';
+      const overlap = pos==='l' ? '' : 'margin-left:-1px;';
+      return 'display:inline-block;font-size:11.5px;font-family:\'Geist Mono\',monospace;padding:5px 13px;cursor:pointer;border:1px solid '+(active?color:'#2a3a4c')+';'+radius+overlap+(active?('color:#06121a;background:'+color+';font-weight:600;position:relative;z-index:1;'):'color:#768493;background:#0a1118;');
+    };
+    const wsBadgeStyleAccess = 'font-size:10.5px;font-family:\'Geist Mono\',monospace;color:#a78bfa;border:1px solid rgba(167,139,250,0.35);background:rgba(167,139,250,0.12);border-radius:999px;padding:3px 11px;';
+    const addBtn = (color)=>'font-size:11.5px;font-family:\'Geist Mono\',monospace;color:'+color+';border:1px solid '+color+'55;background:'+color+'14;border-radius:7px;padding:5px 11px;cursor:pointer;margin-left:6px;';
+    // Three groups: full-access admins/owner (incl. you), members already granted,
+    // and previously-invited members not yet added (candidates to add).
+    const accessAdminRows = [], accessGrantedRows = [], accessCandidates = [];
+    s.accessUsers.forEach(u => {
+      const initials = (u.email||'?').slice(0,2).toUpperCase();
+      const ws = u.workspaceRole || 'member';
+      if (ws==='owner' || ws==='admin') {
+        accessAdminRows.push({ email:u.email, initials, nameSuffix: u.email===s.userEmail?' (you)':'',
+          wsBadge: ws==='owner' ? 'Owner · full access' : 'Admin · full access', wsBadgeStyle: wsBadgeStyleAccess });
+        return;
+      }
+      const role = s.accessRoles[u.id] || '';
+      if (role) {
+        accessGrantedRows.push({ userId:u.id, email:u.email, initials,
+          chatStyle: seg(role==='viewer', '#60a5fa', 'l'), sourceStyle: seg(role==='editor', '#2dd4bf', 'r'),
+          setChat: ()=>this.setAccess(u.id, 'viewer'), setSource: ()=>this.setAccess(u.id, 'editor'),
+          remove: ()=>this.askRemove(u.id, u.email) });
+      } else {
+        accessCandidates.push({ userId:u.id, email:u.email, initials,
+          addChatStyle: addBtn('#60a5fa'), addSourceStyle: addBtn('#2dd4bf'),
+          addChat: ()=>this.setAccess(u.id, 'viewer'), addSource: ()=>this.setAccess(u.id, 'editor') });
+      }
+    });
+
+    return {
+      // gate: render nothing meaningful until bootstrap resolves
+      isAuth: s.stage!=='app', isApp: s.stage==='app',
+      isLogin: s.stage==='login', isSetup: s.stage==='setup', isChangePw: s.stage==='changePassword',
+      // auth screen. Register mode is reached only at bootstrap (first owner).
+      authTitle: s.authMode==='register' ? 'Create root/admin user' : 'Sign in',
+      authSubtitle: s.authMode==='register' ? 'This first account becomes the workspace owner — it holds admin rights and provisions everyone else.' : 'Welcome back. Pick up where your spaces left off.',
+      authBtnLabel: s.authBusy ? 'Working…' : (s.authMode==='register' ? 'Create owner account' : 'Sign in'),
+      authBtnStyle: 'width:100%; margin-top:20px; background:#e0454a; color:#fff; border:0; border-radius:9px; padding:12px; font:600 13.5px \'Geist\'; cursor:'+(s.authBusy?'default':'pointer')+';'+(s.authBusy?'opacity:0.75;':''),
+      email: s.email, password: s.password, onEmail:this.onEmail, onPassword:this.onPassword, onAuthKey:this.onAuthKey,
+      submitAuth: this.submitAuth, authError: s.authError,
+      // forced first-login password change
+      cpCurrent: s.cpCurrent, cpNew: s.cpNew, cpConfirm: s.cpConfirm, cpError: s.cpError,
+      onCpCurrent:this.onCpCurrent, onCpNew:this.onCpNew, onCpConfirm:this.onCpConfirm,
+      submitChangePassword:this.submitChangePassword,
+      cpBtnLabel: s.cpBusy ? 'Updating…' : 'Set new password',
+      cpBtnStyle: 'width:100%; margin-top:20px; background:#e0454a; color:#fff; border:0; border-radius:9px; padding:12px; font:600 13.5px \'Geist\'; cursor:'+(s.cpBusy?'default':'pointer')+';'+(s.cpBusy?'opacity:0.75;':''),
+      // setup
+      setupProviderStep: s.setupStep==='provider', setupConnectStep: s.setupStep==='connect',
+      setupStepNum: s.setupStep==='provider'?1:2,
+      step1Bar: '#e0454a', step2Bar: s.setupStep==='connect'?'#e0454a':'#1f2c3b',
+      providers, providerLabel: (this.PROVIDERS.find(p=>p.id===s.provider)||{}).name, providerNext:this.providerNext,
+      ollamaHost: s.ollamaHost, onHost:this.onHost, testConn:this.testConn, testBtnLabel, testBtnStyle, testDisabled: connTesting,
+      connTesting, connOk, connNoModels, connError, connMessage: s.connMessage, connOkLine, showDockerHint,
+      chatModels, finishBtnStyle, setupBack:this.setupBack, finishSetup:this.finishSetup, finishDisabled: !finishReady,
+      // sidebar
+      spaceList, noSpaces: s.spaces.length===0, hasActiveSpace,
+      spaceName: meta.name, sourceCount: connectorsRaw.length,
+      userEmail: s.userEmail, userInitials: (s.userEmail||'?').slice(0,2).toUpperCase(),
+      createSpace: this.createSpace, logout: this.logout, newChat: this.newChat,
+      // nav
+      goChat: this.goChat, goSources: this.goSources, goAgents: ()=>{}, goMembers: this.goMembers,
+      navChat: { style:this.navStyle(s.view==='chat'), icon: s.view==='chat'?'#e0454a':'#768493' },
+      navSources: { style:this.navStyle(s.view==='sources'), icon: s.view==='sources'?'#e0454a':'#768493' },
+      navAgents: { style:this.navStyle(false), icon:'#768493' },
+      navMembers: { style:this.navStyle(s.view==='members'), icon: s.view==='members'?'#e0454a':'#768493' },
+      isChat: s.view==='chat', isSources: s.view==='sources', isAgents:false, isMembers: s.view==='members', isAccess: s.view==='access',
+      // members & access (admin only)
+      canManageMembers, isOwner, membersBusy: s.membersBusy,
+      matrixSpaces, matrixRows, hasMatrixSpaces: matrixSpaces.length>0,
+      roleLabel: s.userRole, workspaceRoleLabel: 'workspace '+(s.userRole||'member'),
+      userFooterStyle: (canManageMembers ? '' : 'margin-top:auto;') + 'padding:12px; border-top:1px solid #1f2c3b; display:flex; align-items:center; gap:10px;',
+      secondAdminNudge: canManageMembers && adminCount<=1 && s.members.length>0 && !s.nudgeDismissed,
+      dismissNudge: this.dismissNudge, openInvite: this.openInvite,
+      // per-space access tab
+      accessSpaceName: s.accessSpaceName, accessBusy: s.accessBusy,
+      accessAdminRows, accessGrantedRows, accessCandidates,
+      hasGranted: accessGrantedRows.length>0, hasCandidates: accessCandidates.length>0,
+      noGranted: accessGrantedRows.length===0, noCandidates: accessCandidates.length===0,
+      openAddDrawer: this.openAddDrawer, closeAddDrawer: this.closeAddDrawer, addDrawerOpen: s.addDrawerOpen,
+      // remove-access confirmation
+      removeOpen: !!s.removeTarget, removeEmail: s.removeTarget ? s.removeTarget.email : '',
+      cancelRemove: this.cancelRemove, confirmRemove: this.confirmRemove,
+      // invite / temp-password dialog
+      inviteOpen: s.inviteOpen, inviteEmail: s.inviteEmail, onInviteEmail: this.onInviteEmail,
+      submitInvite: this.submitInvite, closeInvite: this.closeInvite,
+      inviteBusy: s.inviteBusy, inviteResult: s.inviteResult,
+      inviteBtnLabel: s.inviteBusy ? 'Creating…' : 'Create account',
+      inviteHasResult: !!s.inviteResult, inviteFormOpen: s.inviteOpen && !s.inviteResult,
+      inviteBtnStyle: 'font-size:13px; color:#fff; background:'+((s.inviteEmail||'').trim()?'#e0454a':'#7a2c2f')+'; border:0; border-radius:7px; padding:9px 16px; cursor:'+(s.inviteBusy?'wait':((s.inviteEmail||'').trim()?'pointer':'not-allowed'))+';',
+      inviteResultEmail: s.inviteResult ? s.inviteResult.email : '',
+      inviteResultPw: s.inviteResult ? s.inviteResult.tempPassword : '',
+      inviteResultTitle: s.inviteResult && s.inviteResult.reset ? 'Password reset' : 'Account created',
+      // conversation menu
+      convMenuOpen: !!s.convMenuOpen, toggleConvMenu:this.toggleConvMenu, closeConvMenu:this.closeConvMenu,
+      showConvSearch: convs.length>MENU_CAP, convSearch:s.convSearch||'', onConvSearch:this.onConvSearch,
+      convList, convNoResults: query.length>0 && filtered.length===0,
+      hasConvMore: filtered.length>capped.length, convMoreHint: filtered.length>capped.length ? ('+ '+(filtered.length-capped.length)+' more — refine your search') : '',
+      currentThreadTitle: cur ? (cur.title||'New chat') : 'New chat',
+      currentThreadTime: cur ? this.fmtTime(cur.updatedAt) : '',
+      convMenuBg: s.convMenuOpen ? '#131c28' : 'transparent',
+      convMenuBorder: s.convMenuOpen ? '#2a3a4c' : '#1f2c3b',
+      convChevron: s.convMenuOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+      // chat
+      headerDotStyle:'width:8px;height:8px;border-radius:50%;background:'+spaceColor+';',
+      modelChip: 'ollama · '+(s.settingsModel||'model'),
+      syncingBanner: isSyncing,
+      msgs, showEmpty, showNoConnectors,
+      spaceKey: sid || 'none', showChatSkeleton: s.switchingSpace && msgs.length===0,
+      loading: s.loading, loadingLabel: s.loadingLabel,
+      streaming: s.streaming, notStreaming: !s.streaming,
+      draft: s.draft, onDraft:this.onDraft, onKey:this.onKey, send:this.send, stopStream:this.stopStream,
+      composerPlaceholder: 'Ask anything grounded in '+(meta.name||'this space')+'…',
+      hasLastTiming: !!lastTV, lastTimingBar: lastTV?lastTV.bar:[], lastTimingLabel: lastTV?lastTV.label:'',
+      // rail
+      railSubtitle: railSources.length? ('top-k = '+railSources.length+' · ranked by similarity') : 'nothing retrieved yet',
+      railBusy: s.loading || s.switchingSpace,
+      railSources, showSources: !s.loading && !s.switchingSpace && railSources.length>0, showRailHint: !s.loading && !s.switchingSpace && railSources.length===0,
+      // sources view
+      connectors, noConnectors: !hasConnectors,
+      showAddForm: s.addFormOpen, hideAddForm: !s.addFormOpen,
+      kindOptions, credPlaceholder, newCred: s.newCred, onNewCred:this.onNewCred,
+      targetPlaceholder, showTargetInput, newTargets: s.newTargets, onNewTargets:this.onNewTargets,
+      openAddForm:this.openAddForm, cancelAddForm:this.cancelAddForm, submitConnector:this.submitConnector,
+      pickUploadFiles:this.pickUploadFiles, uploadBusy: s.uploadBusy,
+      onUploadDragOver:this.onUploadDragOver, onUploadDragLeave:this.onUploadDragLeave, onUploadDrop:this.onUploadDrop,
+      uploadLabel: s.uploadBusy ? 'Uploading…' : (s.uploadDragging ? 'Drop files to upload' : 'Upload files · or drag & drop'),
+      uploadBtnStyle: 'display:flex; align-items:center; justify-content:center; gap:9px; background:'+(s.uploadDragging?'rgba(96,165,250,0.12)':'#070a0e')+'; border:1px dashed '+(s.uploadBusy?'#1f2c3b':(s.uploadDragging?'#60a5fa':'rgba(96,165,250,0.4)'))+'; border-radius:10px; padding:14px; color:'+(s.uploadBusy?'#4d5b6b':(s.uploadDragging?'#60a5fa':'#aebac8'))+'; cursor:'+(s.uploadBusy?'not-allowed':'pointer')+'; font:12.5px \'Geist\'; width:100%; transition:background .12s,border-color .12s;',
+      vectorLine: totalChunks+' chunks indexed · all-MiniLM-L6-v2 · cosine',
+      spaceDocs, hasDocs: spaceDocs.length>0, docCount: spaceDocs.length,
+      promptPreview: space ? (space.customPrompt || '(no custom prompt set — answers use the default behavior)') : '',
+      // prompt modal
+      promptOpen: s.promptOpen, promptText: s.promptDraft, onPromptInput:this.onPromptInput,
+      openPrompt:this.openPrompt, closePrompt:this.closePrompt, savePrompt:this.savePrompt, stop:this.stop,
+      // create-space dialog
+      createOpen: s.createOpen, createName: s.createName, onCreateName:this.onCreateName, onCreateKey:this.onCreateKey,
+      cancelCreateSpace:this.cancelCreateSpace, submitCreateSpace:this.submitCreateSpace,
+      createBtnLabel: s.createBusy ? 'Creating…' : 'Create space',
+      createBtnStyle: 'font-size:13px; color:#fff; background:'+(s.createName.trim()?'#e0454a':'#7a2c2f')+'; border:0; border-radius:7px; padding:9px 16px; cursor:'+(s.createBusy?'wait':(s.createName.trim()?'pointer':'not-allowed'))+'; opacity:'+(s.createBusy?'0.7':'1')+';',
+      // delete-space confirm dialog
+      confirmOpen: !!s.confirmSpace, confirmName: s.confirmSpace ? s.confirmSpace.name : '',
+      confirmBusy: s.confirmBusy, confirmBtnLabel: s.confirmBusy ? 'Deleting…' : 'Delete space',
+      confirmBtnStyle: 'font-size:13px; color:#fff; background:#e0454a; border:0; border-radius:7px; padding:9px 16px; cursor:'+(s.confirmBusy?'wait':'pointer')+'; opacity:'+(s.confirmBusy?'0.7':'1')+';',
+      cancelDeleteSpace:this.cancelDeleteSpace, confirmDeleteSpace:this.confirmDeleteSpace,
+      promptChars: (s.promptDraft||'').length, promptVarsHint: '{{space.name}} / {{user.name}}',
+      // agents (out of scope — empty). NOTE: do not re-add matrixSpaces/matrixRows
+      // here — they are set from real member data above; an empty stub here would
+      // override them (last key wins) and blank the Members table.
+      agentCount:'', agentList:[], selectedAgent:null, hasAgents:false, noAgents:true,
+      // toast
+      toast: s.toast,
+    };
+  }
+}
+</script>
+</body>
+</html>

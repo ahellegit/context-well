@@ -1,0 +1,174 @@
+// Context Well persistence. SQLite for v1, datasource swappable.
+// A space's `slug` is its CyborgDB index name (namespace-as-slug). The
+// DocumentVector join table maps documents to vector IDs for correct
+// deletion and resync. JSON-shaped fields are stored as TEXT and
+// (de)serialized in the app layer for SQLite portability.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                    String       @id @default(cuid())
+  email                 String       @unique
+  passwordHash          String
+  // Workspace-level role (RBAC). "owner" is the bootstrap account; "admin"
+  // holds management rights; "member" is a plain user. Per-space access is
+  // separate (see Membership). Validated at the app layer (SQLite has no enums).
+  workspaceRole         String       @default("member") // owner | admin | member
+  // Set when an admin provisions/resets the account with a temp password; the
+  // user is forced to change it on first login.
+  mustChangePassword    Boolean      @default(false)
+  tempPasswordExpiresAt DateTime?
+  createdAt             DateTime     @default(now())
+  sessions              Session[]
+  memberships           Membership[]
+  conversations         Conversation[]
+}
+
+// Per-space role grant. Editors ingest/manage; viewers chat/read.
+// cyborgUserId / wrapped tokens are deliberately absent — that is the crypto
+// branch's concern, not this app-layer design.
+model Membership {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  spaceId   String
+  space     Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  role      String // editor | viewer
+  createdAt DateTime @default(now())
+
+  @@unique([userId, spaceId])
+  @@index([userId])
+  @@index([spaceId])
+}
+
+// Append-only accountability log for membership/account changes.
+// actorUserId/targetUserId/spaceId are plain columns, NOT relations: the log
+// must outlive the rows it references (a deleted user's grants still audited).
+// Never stores secret material.
+model AuditLog {
+  id           String   @id @default(cuid())
+  actorUserId  String
+  action       String // account.create | role.grant | role.change | role.revoke | admin.promote | admin.demote | password.reset
+  targetUserId String?
+  spaceId      String?
+  role         String?
+  outcome      String // ok | rejected
+  detail       String   @default("") // optional human note, no secrets
+  createdAt    DateTime @default(now())
+
+  @@index([actorUserId])
+  @@index([targetUserId])
+  @@index([createdAt])
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model Space {
+  id                  String         @id @default(cuid())
+  slug                String         @unique
+  name                String
+  customPrompt        String         @default("") /// @encrypted — may hold sensitive business context
+  // 32-byte CyborgDB index key, hex-encoded. Encrypted at rest: a
+  // stolen app.db no longer yields the key that decrypts the embeddings. Read
+  // via prisma it decrypts to hex, which hexToKey() feeds to the SDK unchanged.
+  indexKey            String         /// @encrypted
+  embeddingModel      String         @default("all-MiniLM-L6-v2")
+  similarityThreshold Float          @default(0.35)
+  createdAt           DateTime       @default(now())
+  connectors          Connector[]
+  documents           Document[]
+  conversations       Conversation[]
+  memberships         Membership[]
+}
+
+model Connector {
+  id          String     @id @default(cuid())
+  spaceId     String
+  space       Space      @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  kind        String // "github" | "slack"
+  credentials String /// @encrypted — GitHub PAT / Slack token; encrypted at rest, never returned to the browser
+  targets     String     @default("[]") // JSON array of selected repos/channels
+  status      String     @default("idle") // idle|validating|auth_error|syncing|connected|partial|error
+  detail      String     @default("") // human summary / per-target results (JSON)
+  lastSyncAt  DateTime?
+  chunkCount  Int        @default(0)
+  documents   Document[]
+
+  @@index([spaceId])
+}
+
+model Document {
+  id          String           @id @default(cuid())
+  spaceId     String
+  space       Space            @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  connectorId String
+  connector   Connector        @relation(fields: [connectorId], references: [id], onDelete: Cascade)
+  externalRef String // stable source ref (repo path, issue ref, channel+ts)
+  title       String           /// @encrypted — document title, encrypted at rest
+  metadata    String           @default("{}") /// @encrypted — JSON, encrypted at rest
+  vectors     DocumentVector[]
+
+  @@index([spaceId])
+  @@index([connectorId])
+}
+
+model DocumentVector {
+  id         String   @id @default(cuid())
+  documentId String
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  vectorId   String // the chunk ID upserted into CyborgDB
+
+  @@index([documentId])
+  @@index([vectorId])
+}
+
+model Conversation {
+  id        String    @id @default(cuid())
+  spaceId   String
+  space     Space     @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  // Owner of the thread. Conversations are PRIVATE: only their creator may list
+  // or open them — admins included. Nullable only so the additive migration can
+  // backfill existing rows; new conversations always set it.
+  userId    String?
+  user      User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String    @default("New chat") /// @encrypted — often derived from the first message
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  messages  Message[]
+
+  @@index([spaceId])
+  @@index([userId])
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role           String // "user" | "assistant"
+  text           String       /// @encrypted — chat message content, encrypted at rest
+  // Full snapshot of cited source cards: [{id,title,snippet,score,connector}]
+  sources        String       @default("[]") /// @encrypted — cited snippets, encrypted at rest
+  createdAt      DateTime     @default(now())
+
+  @@index([conversationId])
+}
+
+model SystemSetting {
+  key   String @id
+  value String
+}

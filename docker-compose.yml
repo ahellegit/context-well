@@ -1,0 +1,91 @@
+# Context Well stack: the app + cyborgdb-service in standalone/disk mode.
+# Ollama is external — set its URL during in-app setup. Inside this
+# network, "localhost" is the container, so point Ollama at host.docker.internal
+# (Mac/Windows) or your host LAN IP. See .env.example.
+
+# Branch-specific project name so volumes don't collide with other RBAC branches
+# checked out in this same directory (avoids cross-branch Prisma migration corruption).
+name: context-well-rag
+
+services:
+  app:
+    build: .
+    # Provide a .env to override the defaults below (e.g. a custom SESSION_SECRET
+    # or a remote Ollama URL). It must supply PRISMA_FIELD_ENCRYPTION_KEY — the
+    # at-rest encryption master key is required and deliberately NOT generated for
+    # you (a key auto-persisted onto app_data would sit next to the DB it protects,
+    # defeating encryption at rest). Generate one with `npx cloak generate`.
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      # Reach cyborgdb-service over the compose network, not localhost.
+      CYBORGDB_URL: http://cyborgdb-service:8000
+      DATABASE_URL: file:/data/app.db
+      # Required. Injected from the host env or .env; kept off the app_data volume
+      # on purpose. Compose fails fast with this message if it is unset.
+      PRISMA_FIELD_ENCRYPTION_KEY: "${PRISMA_FIELD_ENCRYPTION_KEY:?set it in .env, generate with npx cloak generate}"
+      # Pre-fills the setup wizard's Ollama field. host.docker.internal is mapped
+      # via extra_hosts below; the app's SSRF guard allows this hostname (it
+      # blocks private IP literals). Override in .env to point elsewhere.
+      OLLAMA_DEFAULT_URL: ${OLLAMA_DEFAULT_URL:-http://host.docker.internal:11434}
+    ports:
+      - "${PORT:-3000}:3000"
+    # On Linux, host.docker.internal isn't defined by default. Map it to the host
+    # gateway so the container can reach a local Ollama on the host. The app's
+    # SSRF guard blocks private IP literals (192.168/10/172.16 ranges) but allows
+    # this hostname, so host.docker.internal is the supported way in.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - app_data:/data
+    depends_on:
+      cyborgdb-service:
+        condition: service_healthy
+
+  # One-shot ownership fix: a named volume is created root-owned on first use,
+  # but cyborgdb-service runs as cyborguser (uid 1000) and must write the
+  # embedding model into the HF cache. Without this, createIndex fails with
+  # "permission denied (RBAC): ... PermissionError [Errno 13]". Overrides the
+  # image entrypoint (a bare `command` would be passed to cyborgdb-service).
+  cyborgdb-init:
+    image: cyborginc/cyborgdb-service:0.17.0
+    user: root
+    entrypoint: ["chown", "-R", "1000:1000", "/home/cyborguser/.cache"]
+    volumes:
+      - cyborgdb_hf_cache:/home/cyborguser/.cache/huggingface
+    restart: "no"
+
+  cyborgdb-service:
+    image: cyborginc/cyborgdb-service:0.17.0
+    depends_on:
+      cyborgdb-init:
+        condition: service_completed_successfully
+    environment:
+      # Standalone disk (RocksDB) backend — persisted in the volume below.
+      CYBORGDB_DB_TYPE: disk
+      # No CyborgDB license key is set, which allows up to 1M embeddings per
+      # index. Add `CYBORGDB_API_KEY: cyborg_...` here to raise the limit with a
+      # paid license.
+      # Embedding speed: in online mode the service re-validates the embedding
+      # model against huggingface.co on EVERY query (~2s/query). Once the model
+      # is cached in the hf_cache volume below, set CYBORGDB_HF_OFFLINE=1 in .env
+      # and recreate this service to skip those calls (~2250ms -> ~65ms/query).
+      # Default 0 so a fresh deploy can download the model on first use.
+      HF_HUB_OFFLINE: ${CYBORGDB_HF_OFFLINE:-0}
+      TRANSFORMERS_OFFLINE: ${CYBORGDB_HF_OFFLINE:-0}
+    volumes:
+      - cyborgdb_data:/app/cyborgdb_data
+      # Persist the downloaded embedding model so it survives restarts and so
+      # CYBORGDB_HF_OFFLINE=1 has a populated cache to read from.
+      - cyborgdb_hf_cache:/home/cyborguser/.cache/huggingface
+    healthcheck:
+      test: ["CMD", "sh", "-c", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/v1/health')\""]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+volumes:
+  app_data:
+  cyborgdb_data:
+  cyborgdb_hf_cache:
