@@ -14,6 +14,8 @@ import {
   spaceFromParam,
 } from "../auth/space-guard.js";
 import { listSpaceMembers } from "../members/service.js";
+import { IndexLockedError } from "../cyborg/index-service.js";
+import { buildSpaceGraph, getDocGraph } from "./graph.js";
 import {
   appendMessage,
   createConversation,
@@ -102,6 +104,51 @@ export default async function spacesRoutes(app: FastifyInstance): Promise<void> 
       return reply.code(404).send({ error: "Space not found." });
     }
     return listDocuments(id);
+  });
+
+  // SPIKE: on-the-fly similarity graph of a space's chunks, for the graph
+  // explorer at /graph.html. Read-only, viewer+. Reuses the space's cosine
+  // index — no new store. Query params: ?nodes= &k= &threshold=.
+  app.get("/api/spaces/:id/graph", { preHandler: requireSpaceRole("viewer", spaceFromParam) }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const space = await getSpace(id);
+    if (!space) {
+      return reply.code(404).send({ error: "Space not found." });
+    }
+    const q = request.query as {
+      nodes?: string;
+      k?: string;
+      threshold?: string;
+      level?: string;
+      refresh?: string;
+    };
+    const num = (v: string | undefined): number | undefined =>
+      v != null && v !== "" && !Number.isNaN(Number(v)) ? Number(v) : undefined;
+    try {
+      // Document-level map (Sources view, cached) vs chunk-level graph (page).
+      if (q.level === "document") {
+        return await getDocGraph(
+          space,
+          {
+            maxDocs: num(q.nodes),
+            neighbors: num(q.k),
+            threshold: num(q.threshold),
+          },
+          q.refresh === "1",
+        );
+      }
+      return await buildSpaceGraph(space, {
+        maxNodes: num(q.nodes),
+        neighbors: num(q.k),
+        threshold: num(q.threshold),
+      });
+    } catch (error) {
+      // A locked/unopenable index is a known, reportable state — not a 500.
+      if (error instanceof IndexLockedError) {
+        return reply.code(423).send({ error: error.message });
+      }
+      throw error;
+    }
   });
 
   // List a space's conversations. Viewer+.

@@ -508,6 +508,23 @@
             <div style="font-size:11px; color:#768493; font-family:'Geist Mono',monospace; margin-top:10px;">applies to all chats &amp; agents in this space</div>
           </div>
         </div>
+
+        <!-- SPACE MAP · document-level similarity -->
+        <div style="max-width:1100px; margin-top:30px;">
+          <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+            <span style="font-size:10px; letter-spacing:0.1em; color:#768493; text-transform:uppercase; font-family:'Geist Mono',monospace;">Space map</span>
+            <span style="font-size:11px; color:#4d5b6b; font-family:'Geist Mono',monospace;">· document similarity</span>
+            <button onClick="{{ buildSpaceMap }}" disabled="{{ mapBtnDisabled }}" style="{{ mapBtnStyle }}; margin-left:auto;">{{ mapBtnLabel }}</button>
+          </div>
+          <div style="position:relative; height:400px; background:#070a0e; border:1px solid #1f2c3b; border-radius:12px; overflow:hidden;">
+            <sc-if value="{{ mapEmpty }}">
+              <div style="position:absolute; inset:0; z-index:2; display:flex; align-items:center; justify-content:center; text-align:center; color:#4d5b6b; font-size:12.5px; font-family:'Geist Mono',monospace; padding:24px; line-height:1.6; pointer-events:none;">{{ mapPlaceholder }}</div>
+            </sc-if>
+            <canvas data-graph-canvas style="width:100%; height:100%; display:block;"></canvas>
+            <div style="position:absolute; top:10px; left:12px; z-index:3; font-family:'Geist Mono',monospace; font-size:11px; color:#768493; pointer-events:none;">{{ mapStatus }}</div>
+          </div>
+          <div style="font-size:10.5px; color:#768493; font-family:'Geist Mono',monospace; margin-top:8px; line-height:1.5;">{{ mapHint }}</div>
+        </div>
       </div>
     </sc-if>
 
@@ -921,6 +938,8 @@ class Component extends DCLogic {
       uploadDragging: false,
       // settings (persisted)
       settingsModel: '',
+      // space map (doc-level similarity graph, Sources view) — auto-built, cached per space
+      graphBySpace: {}, graphBuildingBySpace: {}, graphErrorBySpace: {},
       toast: null,
     };
     // bind handlers
@@ -939,12 +958,238 @@ class Component extends DCLogic {
       'goChat','goSources',
       'openAddForm','cancelAddForm','onNewCred','onNewTargets','submitConnector',
       'pickUploadFiles','uploadFiles','onUploadDragOver','onUploadDragLeave','onUploadDrop',
+      'buildSpaceMap',
     ].forEach(m => { this[m] = this[m].bind(this); });
     this.stop = (e)=>{ e && e.stopPropagation && e.stopPropagation(); };
   }
 
   async componentDidMount() {
     await this.bootstrap();
+  }
+
+  // ---------- space map (doc-level graph) ----------
+  // Auto-builds when a space's Sources view opens; the result is cached per
+  // space (client + server), so re-opening is instant. Mounts/unmounts the
+  // canvas engine imperatively so React re-renders never clobber the simulation.
+  componentDidUpdate() {
+    const s = this.state;
+    const onMap = s.stage === 'app' && s.view === 'sources' && s.spaceId;
+    if (!onMap) { this._teardownGraph(); return; }
+    const sid = s.spaceId;
+    const gd = (s.graphBySpace || {})[sid] || null;
+    const building = !!(s.graphBuildingBySpace || {})[sid];
+    const err = (s.graphErrorBySpace || {})[sid];
+    const hasDocs = (((s.documentsBySpace || {})[sid]) || []).length > 0;
+    // Build by default: fire once on entering a non-empty space's Sources view.
+    // Guarded so it never loops (building/err/gd all short-circuit re-entry).
+    if (!gd && !building && !err && hasDocs) { this.buildSpaceMap(false); return; }
+    // Mount (or remount on a fresh build) the engine for the current data.
+    if (gd) {
+      if (this._graphData !== gd) {
+        const canvas = document.querySelector('[data-graph-canvas]');
+        if (canvas) {
+          if (this._graphEngine) this._graphEngine.destroy();
+          this._graphEngine = this._makeGraphEngine(canvas, gd);
+          this._graphData = gd;
+        }
+      }
+    } else {
+      this._teardownGraph();
+    }
+  }
+  _teardownGraph() {
+    if (this._graphEngine) { this._graphEngine.destroy(); this._graphEngine = null; }
+    this._graphData = null;
+  }
+
+  // refresh=true (the Rebuild button, which is called with the click event —
+  // any truthy value) forces a server recompute; the auto-build passes false to
+  // use the cache.
+  async buildSpaceMap(refresh) {
+    const sid = this.state.spaceId;
+    if (!sid || (this.state.graphBuildingBySpace || {})[sid]) return;
+    this.setState((st) => ({
+      graphBuildingBySpace: { ...st.graphBuildingBySpace, [sid]: true },
+      graphErrorBySpace: { ...st.graphErrorBySpace, [sid]: '' },
+    }));
+    const url = '/api/spaces/' + sid + '/graph?level=document&nodes=150&k=12&threshold=0.5' + (refresh ? '&refresh=1' : '');
+    const r = await this.apiJson(url);
+    this.setState((st) => {
+      const building = { ...st.graphBuildingBySpace }; delete building[sid];
+      if (!r.ok) {
+        const msg = r.status === 423 ? 'This space’s index is locked — nothing to map.'
+          : r.status === 403 ? 'You need access to build this map.'
+          : 'Could not build the map (' + r.status + ').';
+        return { graphBuildingBySpace: building, graphErrorBySpace: { ...st.graphErrorBySpace, [sid]: msg } };
+      }
+      return {
+        graphBuildingBySpace: building,
+        graphBySpace: { ...st.graphBySpace, [sid]: r.body },
+        graphErrorBySpace: { ...st.graphErrorBySpace, [sid]: '' },
+      };
+    });
+  }
+
+  // Self-contained force-directed renderer. No dependency on the framework;
+  // returns { destroy } to tear down listeners, the RAF loop, and the tooltip.
+  _makeGraphEngine(canvas, data) {
+    const CONN = { github:'#22c55e', slack:'#a78bfa', upload:'#60a5fa', unknown:'#768493' };
+    const connColor = (c) => CONN[c] || CONN.unknown;
+    const ctx = canvas.getContext('2d');
+    const host = canvas.parentNode;
+    const tip = document.createElement('div');
+    tip.style.cssText = 'position:absolute;z-index:5;pointer-events:none;max-width:280px;background:rgba(6,12,18,0.97);border:1px solid #2a3a4c;border-radius:9px;padding:9px 11px;font:12px \'Geist Mono\',monospace;color:#e8eef5;opacity:0;transition:opacity .12s;box-shadow:0 12px 30px rgba(0,0,0,0.5);';
+    host.appendChild(tip);
+
+    let W = 0, H = 0, dpr = 1, nodes = [], edges = [], adj = {}, byId = {};
+    let alpha = 0, raf = null, drawRaf = null, hover = null, dragging = null;
+    const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    function resize() {
+      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      W = host.clientWidth; H = host.clientHeight;
+      canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    function ingest(d) {
+      byId = {}; adj = {};
+      nodes = d.nodes.map((n, i) => {
+        const a = (i / Math.max(d.nodes.length, 1)) * Math.PI * 2;
+        const r = Math.min(W, H) * 0.34 * (0.5 + Math.random() * 0.5);
+        return { id:n.id, label:n.label, connector:n.connector, snippet:n.snippet, chunks:n.chunks||0,
+          x: W/2 + Math.cos(a)*r, y: H/2 + Math.sin(a)*r, vx:0, vy:0, fx:null, fy:null, deg:0 };
+      });
+      nodes.forEach(n => { byId[n.id] = n; adj[n.id] = {}; });
+      edges = (d.edges || []).filter(e => byId[e.source] && byId[e.target])
+        .map(e => ({ source:e.source, target:e.target, weight:e.weight, a:byId[e.source], b:byId[e.target] }));
+      edges.forEach(e => { e.a.deg++; e.b.deg++; adj[e.source][e.target] = true; adj[e.target][e.source] = true; });
+    }
+    const radiusOf = (n) => 5 + Math.min(n.deg, 14) * 1.5;
+
+    function tick() {
+      let i, j, n, m, dx, dy, d2, d, f;
+      for (i = 0; i < nodes.length; i++) {
+        n = nodes[i];
+        for (j = i + 1; j < nodes.length; j++) {
+          m = nodes[j];
+          dx = n.x - m.x; dy = n.y - m.y; d2 = dx*dx + dy*dy || 0.01;
+          if (d2 > 90000) continue;
+          d = Math.sqrt(d2); f = (4200 / d2) * alpha;
+          const ux = dx/d, uy = dy/d;
+          n.vx += ux*f; n.vy += uy*f; m.vx -= ux*f; m.vy -= uy*f;
+        }
+      }
+      for (i = 0; i < edges.length; i++) {
+        const e = edges[i]; n = e.a; m = e.b;
+        const rest = 44 + (1 - e.weight) * 90;
+        dx = m.x - n.x; dy = m.y - n.y; d = Math.sqrt(dx*dx + dy*dy) || 0.01;
+        f = (d - rest) * 0.05 * e.weight * alpha;
+        const sx = (dx/d)*f, sy = (dy/d)*f;
+        n.vx += sx; n.vy += sy; m.vx -= sx; m.vy -= sy;
+      }
+      for (i = 0; i < nodes.length; i++) {
+        n = nodes[i];
+        n.vx += (W/2 - n.x) * 0.009 * alpha; n.vy += (H/2 - n.y) * 0.009 * alpha;
+        if (n.fx != null) { n.x = n.fx; n.y = n.fy; n.vx = 0; n.vy = 0; continue; }
+        n.vx *= 0.86; n.vy *= 0.86; n.x += n.vx; n.y += n.vy;
+        const r = radiusOf(n) + 3;
+        n.x = Math.max(r, Math.min(W - r, n.x)); n.y = Math.max(r, Math.min(H - r, n.y));
+      }
+      alpha *= 0.985;
+    }
+    function draw() {
+      ctx.clearRect(0, 0, W, H);
+      const hl = hover;
+      for (let i = 0; i < edges.length; i++) {
+        const e = edges[i], related = hl && (e.a === hl || e.b === hl), dim = hl && !related;
+        ctx.beginPath(); ctx.moveTo(e.a.x, e.a.y); ctx.lineTo(e.b.x, e.b.y);
+        ctx.strokeStyle = related ? '#e0454a' : '#3a4b5e';
+        ctx.globalAlpha = dim ? 0.05 : (related ? 0.9 : 0.12 + e.weight * 0.3);
+        ctx.lineWidth = related ? 2 : 1; ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+      for (let i = 0; i < nodes.length; i++) {
+        const n = nodes[i], r = radiusOf(n), isHl = hl === n, isNbr = hl && adj[hl.id][n.id], dim = hl && !isHl && !isNbr;
+        const col = connColor(n.connector);
+        ctx.globalAlpha = dim ? 0.2 : 1;
+        ctx.beginPath(); ctx.arc(n.x, n.y, r, 0, Math.PI*2);
+        ctx.fillStyle = col; ctx.shadowColor = col; ctx.shadowBlur = isHl ? 20 : (isNbr ? 10 : 5);
+        ctx.fill(); ctx.shadowBlur = 0;
+        ctx.lineWidth = isHl ? 2.5 : 1; ctx.strokeStyle = isHl ? '#fff' : 'rgba(7,10,14,0.9)'; ctx.stroke();
+        const showLabel = (nodes.length <= 40 || isHl || isNbr || r > 11) && !dim;
+        if (showLabel) {
+          const lbl = n.label.length > 26 ? n.label.slice(0, 25) + '…' : n.label;
+          ctx.font = (isHl ? '700 ' : '500 ') + '11px \'Geist Mono\', monospace';
+          ctx.fillStyle = isHl ? '#fff' : '#aebac8'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+          ctx.fillText(lbl, n.x, n.y + r + 3);
+        }
+      }
+      ctx.globalAlpha = 1;
+    }
+    function loop() { tick(); draw(); if (alpha > 0.004) raf = requestAnimationFrame(loop); else raf = null; }
+    function reheat(v) {
+      alpha = Math.max(alpha, v || 0.5);
+      if (reduced) { for (let i = 0; i < 260; i++) tick(); draw(); return; }
+      if (!raf) raf = requestAnimationFrame(loop);
+    }
+    function scheduleDraw() { if (raf || drawRaf) return; drawRaf = requestAnimationFrame(() => { drawRaf = null; draw(); }); }
+
+    function toLocal(ev) { const rc = canvas.getBoundingClientRect(); return { x: ev.clientX - rc.left, y: ev.clientY - rc.top }; }
+    function pick(p) {
+      for (let i = nodes.length - 1; i >= 0; i--) {
+        const n = nodes[i], r = radiusOf(n) + 6, dx = p.x - n.x, dy = p.y - n.y;
+        if (dx*dx + dy*dy <= r*r) return n;
+      }
+      return null;
+    }
+    function esc(s) { return String(s).replace(/[&<>]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;' }[c])); }
+    function showTip(n, p) {
+      tip.innerHTML = '<div style="font-weight:700;word-break:break-word;">' + esc(n.label) + '</div>' +
+        '<div style="color:#768493;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;margin:3px 0 6px;">' + esc(n.connector) + ' · ' + n.chunks + ' chunks · ' + n.deg + ' links</div>' +
+        (n.snippet ? '<div style="color:#9fb0c2;line-height:1.5;">' + esc(n.snippet) + '</div>' : '');
+      tip.style.opacity = '1';
+      const tw = tip.offsetWidth, th = tip.offsetHeight;
+      let x = p.x + 16, y = p.y + 16;
+      if (x + tw > W) x = p.x - tw - 16;
+      if (y + th > H) y = p.y - th - 16;
+      tip.style.left = Math.max(4, x) + 'px'; tip.style.top = Math.max(4, y) + 'px';
+    }
+    const hideTip = () => { tip.style.opacity = '0'; };
+
+    const onDown = (ev) => { const p = toLocal(ev); const n = pick(p); if (n) { dragging = n; n.fx = p.x; n.fy = p.y; canvas.setPointerCapture(ev.pointerId); reheat(0.4); } };
+    const onMove = (ev) => {
+      const p = toLocal(ev);
+      if (dragging) { dragging.fx = p.x; dragging.fy = p.y; reheat(0.3); showTip(dragging, p); return; }
+      const n = pick(p);
+      if (n !== hover) { hover = n; scheduleDraw(); }
+      if (n) showTip(n, p); else hideTip();
+    };
+    const onUp = () => { if (dragging) { dragging.fx = null; dragging.fy = null; dragging = null; reheat(0.25); } };
+    const onLeave = () => { if (!dragging) { hover = null; hideTip(); scheduleDraw(); } };
+    const onResize = () => { resize(); reheat(0.25); };
+
+    canvas.addEventListener('pointerdown', onDown);
+    canvas.addEventListener('pointermove', onMove);
+    canvas.addEventListener('pointerup', onUp);
+    canvas.addEventListener('pointercancel', onUp);
+    canvas.addEventListener('pointerleave', onLeave);
+    window.addEventListener('resize', onResize);
+
+    resize(); ingest(data); reheat(1);
+
+    return {
+      destroy() {
+        if (raf) cancelAnimationFrame(raf);
+        if (drawRaf) cancelAnimationFrame(drawRaf);
+        canvas.removeEventListener('pointerdown', onDown);
+        canvas.removeEventListener('pointermove', onMove);
+        canvas.removeEventListener('pointerup', onUp);
+        canvas.removeEventListener('pointercancel', onUp);
+        canvas.removeEventListener('pointerleave', onLeave);
+        window.removeEventListener('resize', onResize);
+        if (tip.parentNode) tip.parentNode.removeChild(tip);
+      },
+    };
   }
 
   // ---------- API helper ----------
@@ -1204,13 +1449,18 @@ class Component extends DCLogic {
     const documentsBySpace = { ...this.state.documentsBySpace, [spaceId]: documents };
     const syncingSpaces = { ...this.state.syncingSpaces };
     if (syncing) syncingSpaces[spaceId] = true; else delete syncingSpaces[spaceId];
+    // Drop any cached map for this space — the doc set may have changed, so let
+    // the Sources view auto-rebuild (the server cache makes an unchanged rebuild
+    // near-instant, and returns fresh data when documents actually changed).
+    const graphBySpace = { ...this.state.graphBySpace }; delete graphBySpace[spaceId];
+    const graphErrorBySpace = { ...this.state.graphErrorBySpace }; delete graphErrorBySpace[spaceId];
     // Restore the active conversation: in-memory → persisted (localStorage) →
     // most-recent conversation. So a refresh lands back on the chat you were in.
     let activeConv = this.state.activeConvBySpace[spaceId] || (this.navGet().conv||{})[spaceId] || null;
     if (activeConv && !convs.find(c=>c.id===activeConv)) activeConv = null;
     if (!activeConv && convs.length) activeConv = convs[0].id;
     const nextActive = { ...this.state.activeConvBySpace, [spaceId]: activeConv };
-    this.setState({ convsBySpace, connectorsBySpace, documentsBySpace, syncingSpaces, activeConvBySpace: nextActive });
+    this.setState({ convsBySpace, connectorsBySpace, documentsBySpace, syncingSpaces, graphBySpace, graphErrorBySpace, activeConvBySpace: nextActive });
     this.navSave(spaceId, nextActive);
     if (activeConv) await this.openConversation(activeConv); else this.setState({ messages:[], railSources:[], citedSet:{} });
   }
@@ -1874,6 +2124,22 @@ class Component extends DCLogic {
       const t = docTag[d.connector] || { label:d.connector||'doc', color:'#768493' };
       return { title:d.title, tag:t.label, tagColor:t.color, chunkLabel:(d.chunks||0)+' chunk'+((d.chunks===1)?'':'s') };
     });
+    // space map (doc-level graph) view model — auto-built + cached per space
+    const gd = (s.graphBySpace && s.graphBySpace[sid]) || null;
+    const mapReady = !!gd;
+    const mapBusy = !!(s.graphBuildingBySpace && s.graphBuildingBySpace[sid]);
+    const mapErr = (s.graphErrorBySpace && s.graphErrorBySpace[sid]) || '';
+    const mapHasDocs = spaceDocs.length>0;
+    const gm = mapReady ? gd.meta : null;
+    const mapStatus = mapBusy ? 'building map…'
+      : mapReady ? (gm.rendered+' docs · '+gd.edges.length+' links'+(gm.cached?' · cached':'')+(gm.truncated?(' · largest '+gm.rendered+'/'+gm.total):''))
+      : '';
+    const mapPlaceholder = mapErr ? mapErr
+      : !mapHasDocs ? 'No documents in this space yet — add a source, and its map builds automatically.'
+      : 'Preparing map…';
+    const mapBtnLabel = mapBusy ? 'Building…' : (mapReady ? 'Rebuild' : 'Build map');
+    const mapBtnDisabled = mapBusy || !mapHasDocs;
+    const mapBtnStyle = 'font-size:12px; color:'+(mapBtnDisabled?'#768493':'#fff')+'; background:'+(mapBtnDisabled?'#131c28':'#e0454a')+'; border:0; border-radius:7px; padding:7px 14px; cursor:'+(mapBusy?'wait':(mapHasDocs?'pointer':'not-allowed'))+';';
     const hasActiveSpace = !!space;
     const showEmpty = msgs.length===0 && !s.loading && !s.streaming && !s.switchingSpace && hasConnectors;
     const showNoConnectors = msgs.length===0 && !s.loading && !s.streaming && !s.switchingSpace && hasActiveSpace && !hasConnectors;
@@ -2043,6 +2309,10 @@ class Component extends DCLogic {
       uploadBtnStyle: 'display:flex; align-items:center; justify-content:center; gap:9px; background:'+(s.uploadDragging?'rgba(96,165,250,0.12)':'#070a0e')+'; border:1px dashed '+(s.uploadBusy?'#1f2c3b':(s.uploadDragging?'#60a5fa':'rgba(96,165,250,0.4)'))+'; border-radius:10px; padding:14px; color:'+(s.uploadBusy?'#4d5b6b':(s.uploadDragging?'#60a5fa':'#aebac8'))+'; cursor:'+(s.uploadBusy?'not-allowed':'pointer')+'; font:12.5px \'Geist\'; width:100%; transition:background .12s,border-color .12s;',
       vectorLine: totalChunks+' chunks indexed · all-MiniLM-L6-v2 · cosine',
       spaceDocs, hasDocs: spaceDocs.length>0, docCount: spaceDocs.length,
+      // space map (doc-level similarity)
+      buildSpaceMap:this.buildSpaceMap, mapBusy, mapEmpty: !mapReady && !mapBusy,
+      mapStatus, mapPlaceholder, mapBtnLabel, mapBtnStyle, mapBtnDisabled,
+      mapHint: 'Nodes = documents (sized by connections). Lines = semantic overlap. Tight clusters ≈ redundant docs; loners ≈ unique or orphaned content.',
       promptPreview: space ? (space.customPrompt || '(no custom prompt set — answers use the default behavior)') : '',
       // prompt modal
       promptOpen: s.promptOpen, promptText: s.promptDraft, onPromptInput:this.onPromptInput,

@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Space graph · Context Well (spike)</title>
+  <style>
+    :root {
+      --ground: #101720; --panel: #16202c; --panel-2: #1b2735; --line: #2a3a4d;
+      --ink: #eef3f8; --muted: #9fb0c2; --faint: #6c7f92;
+      --ember: #f0912d; --temporal: #57b6d6; --violet: #a78bfa; --slate: #7b8da0; --green: #5fd3a0;
+      --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+      --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; }
+    body {
+      background: var(--ground); color: var(--ink); font-family: var(--sans);
+      display: flex; flex-direction: column; height: 100vh; overflow: hidden;
+    }
+    header {
+      display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+      padding: 12px 18px; border-bottom: 1px solid var(--line); background: var(--panel);
+    }
+    .brand { font-family: var(--mono); font-size: 13px; letter-spacing: 0.06em; color: var(--faint); margin-right: auto; }
+    .brand b { color: var(--ink); }
+    .brand .spike { color: var(--ember); border: 1px solid var(--line); border-radius: 999px; padding: 1px 8px; font-size: 10px; letter-spacing: 0.14em; margin-left: 6px; }
+    label { font-family: var(--mono); font-size: 11px; color: var(--faint); display: inline-flex; align-items: center; gap: 6px; }
+    select, input[type=number] {
+      font-family: var(--mono); font-size: 12px; color: var(--ink);
+      background: var(--ground); border: 1px solid var(--line); border-radius: 8px; padding: 6px 9px;
+    }
+    input[type=range] { accent-color: var(--ember); }
+    .val { color: var(--ember); font-variant-numeric: tabular-nums; min-width: 30px; display: inline-block; }
+    button {
+      font-family: var(--mono); font-size: 12px; color: var(--muted);
+      background: var(--ground); border: 1px solid var(--line); border-radius: 8px;
+      padding: 6px 13px; cursor: pointer;
+    }
+    button:hover { color: var(--ink); border-color: var(--ember); }
+    main { position: relative; flex: 1; min-height: 0; }
+    canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+    canvas:active { cursor: grabbing; }
+    .status {
+      position: absolute; top: 12px; left: 12px; z-index: 4;
+      font-family: var(--mono); font-size: 12px; color: var(--muted);
+      background: rgba(16,23,32,0.86); border: 1px solid var(--line);
+      border-radius: 8px; padding: 8px 12px; max-width: 60%;
+    }
+    .status .warn { color: var(--ember); }
+    .status .err { color: #ff9b8a; }
+    .legend {
+      position: absolute; bottom: 12px; left: 12px; z-index: 4; display: flex; gap: 12px; flex-wrap: wrap;
+      font-family: var(--mono); font-size: 11px; color: var(--muted);
+      background: rgba(16,23,32,0.86); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px;
+    }
+    .legend .it { display: inline-flex; align-items: center; gap: 6px; }
+    .legend .dot { width: 11px; height: 11px; border-radius: 50%; }
+    .tooltip {
+      position: absolute; z-index: 5; pointer-events: none; max-width: 320px;
+      background: rgba(10,15,21,0.97); border: 1px solid var(--line); border-radius: 10px;
+      padding: 10px 12px; font-size: 12px; color: var(--ink);
+      opacity: 0; transform: translateY(4px); transition: opacity .12s, transform .12s;
+      box-shadow: 0 12px 32px rgba(0,0,0,0.5);
+    }
+    .tooltip.on { opacity: 1; transform: translateY(0); }
+    .tooltip .name { font-family: var(--mono); font-weight: 700; font-size: 12.5px; word-break: break-word; }
+    .tooltip .kind { color: var(--faint); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; margin: 3px 0 6px; }
+    .tooltip .snip { color: var(--muted); line-height: 1.5; }
+  </style>
+</head>
+<body>
+  <header>
+    <span class="brand"><b>Context Well</b> · space graph <span class="spike">SPIKE</span></span>
+    <label>Space <select id="space"><option value="">— loading —</option></select></label>
+    <label>Nodes <input id="nodes" type="number" min="10" max="400" step="10" value="150" style="width:66px" /></label>
+    <label>k <input id="k" type="number" min="1" max="20" step="1" value="6" style="width:54px" /></label>
+    <label>Similarity ≥ <input id="threshold" type="range" min="0.3" max="0.95" step="0.01" value="0.55" /> <span class="val" id="threshold-val">0.55</span></label>
+    <button id="load">Build graph</button>
+  </header>
+  <main>
+    <canvas id="graph" aria-label="Similarity graph of the selected space"></canvas>
+    <div class="status" id="status">Pick a space and press <b>Build graph</b>.</div>
+    <div class="legend" id="legend" hidden></div>
+    <div class="tooltip" id="tooltip"></div>
+  </main>
+
+  <script>
+  (function () {
+    "use strict";
+    var CONN = {
+      github:  { color: "#f0912d", label: "GitHub" },
+      slack:   { color: "#a78bfa", label: "Slack" },
+      upload:  { color: "#57b6d6", label: "Upload" },
+      unknown: { color: "#7b8da0", label: "Other" }
+    };
+    function connColor(c) { return (CONN[c] || CONN.unknown).color; }
+
+    var canvas = document.getElementById("graph");
+    var ctx = canvas.getContext("2d");
+    var host = canvas.parentNode;
+    var tooltip = document.getElementById("tooltip");
+    var statusEl = document.getElementById("status");
+    var legendEl = document.getElementById("legend");
+    var reduced = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    var W = 0, H = 0, dpr = 1;
+    var nodes = [], edges = [], adj = {}, byId = {};
+    var alpha = 0, raf = null, hover = null, dragging = null;
+
+    function resize() {
+      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      W = host.clientWidth; H = host.clientHeight;
+      canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+
+    function setStatus(html) { statusEl.innerHTML = html; }
+
+    // ---- data load ----
+    async function loadSpaces() {
+      try {
+        var res = await fetch("/api/spaces", { credentials: "same-origin" });
+        if (res.status === 401) { setStatus('<span class="err">Not signed in.</span> Open the app and log in, then reload this page.'); return; }
+        if (!res.ok) { setStatus('<span class="err">Could not list spaces (' + res.status + ').</span>'); return; }
+        var spaces = await res.json();
+        var sel = document.getElementById("space");
+        sel.innerHTML = "";
+        if (!spaces.length) { sel.innerHTML = '<option value="">no spaces</option>'; return; }
+        spaces.forEach(function (s) {
+          var o = document.createElement("option");
+          o.value = s.id; o.textContent = s.name; sel.appendChild(o);
+        });
+        var qs = new URLSearchParams(location.search).get("space");
+        if (qs) sel.value = qs;
+      } catch (e) {
+        setStatus('<span class="err">Network error listing spaces.</span>');
+      }
+    }
+
+    async function buildGraph() {
+      var id = document.getElementById("space").value;
+      if (!id) { setStatus("Select a space first."); return; }
+      var nodesCap = document.getElementById("nodes").value;
+      var k = document.getElementById("k").value;
+      var threshold = document.getElementById("threshold").value;
+      setStatus("Building graph… (one query per chunk — larger spaces take a few seconds)");
+      try {
+        var url = "/api/spaces/" + encodeURIComponent(id) + "/graph?nodes=" + nodesCap + "&k=" + k + "&threshold=" + threshold;
+        var res = await fetch(url, { credentials: "same-origin" });
+        if (res.status === 423) { setStatus('<span class="err">This space\'s index is locked</span> (key missing/wrong) — nothing to render.'); return; }
+        if (!res.ok) { setStatus('<span class="err">Graph build failed (' + res.status + ').</span>'); return; }
+        var data = await res.json();
+        ingest(data);
+      } catch (e) {
+        setStatus('<span class="err">Network error building graph.</span>');
+      }
+    }
+
+    function ingest(data) {
+      byId = {}; adj = {};
+      nodes = data.nodes.map(function (n, i) {
+        var a = (i / Math.max(data.nodes.length, 1)) * Math.PI * 2;
+        var r = Math.min(W, H) * 0.34 * (0.5 + Math.random() * 0.5);
+        return {
+          id: n.id, label: n.label, connector: n.connector, snippet: n.snippet,
+          x: W / 2 + Math.cos(a) * r, y: H / 2 + Math.sin(a) * r,
+          vx: 0, vy: 0, fx: null, fy: null, deg: 0
+        };
+      });
+      nodes.forEach(function (n) { byId[n.id] = n; adj[n.id] = {}; });
+      edges = data.edges.filter(function (e) { return byId[e.source] && byId[e.target]; });
+      edges.forEach(function (e) {
+        e.a = byId[e.source]; e.b = byId[e.target];
+        e.a.deg++; e.b.deg++;
+        adj[e.source][e.target] = true; adj[e.target][e.source] = true;
+      });
+
+      var m = data.meta;
+      var warn = m.truncated ? ' <span class="warn">· showing first ' + m.rendered + " of " + m.total + " chunks</span>" : "";
+      setStatus("<b>" + m.rendered + "</b> chunks · <b>" + edges.length + "</b> similarity links · k=" + m.k + " · ≥" + m.threshold + warn);
+      drawLegend();
+      reheat(1);
+    }
+
+    function drawLegend() {
+      var present = {};
+      nodes.forEach(function (n) { present[n.connector] = true; });
+      var html = Object.keys(present).map(function (c) {
+        var d = CONN[c] || CONN.unknown;
+        return '<span class="it"><span class="dot" style="background:' + d.color + '"></span>' + d.label + "</span>";
+      }).join("");
+      html += '<span class="it" style="color:var(--faint)">— line = semantic similarity</span>';
+      legendEl.innerHTML = html; legendEl.hidden = false;
+    }
+
+    // ---- simulation ----
+    function radiusOf(n) { return 4 + Math.min(n.deg, 14) * 1.4; }
+
+    function tick() {
+      var i, j, n, m, dx, dy, d2, d, f;
+      for (i = 0; i < nodes.length; i++) {
+        n = nodes[i];
+        for (j = i + 1; j < nodes.length; j++) {
+          m = nodes[j];
+          dx = n.x - m.x; dy = n.y - m.y; d2 = dx * dx + dy * dy || 0.01;
+          if (d2 > 62500) continue;
+          d = Math.sqrt(d2); f = (3600 / d2) * alpha;
+          var ux = dx / d, uy = dy / d;
+          n.vx += ux * f; n.vy += uy * f; m.vx -= ux * f; m.vy -= uy * f;
+        }
+      }
+      for (i = 0; i < edges.length; i++) {
+        var e = edges[i]; n = e.a; m = e.b;
+        var rest = 40 + (1 - e.weight) * 90; // stronger link → shorter
+        dx = m.x - n.x; dy = m.y - n.y; d = Math.sqrt(dx * dx + dy * dy) || 0.01;
+        f = (d - rest) * 0.05 * e.weight * alpha;
+        var sx = (dx / d) * f, sy = (dy / d) * f;
+        n.vx += sx; n.vy += sy; m.vx -= sx; m.vy -= sy;
+      }
+      for (i = 0; i < nodes.length; i++) {
+        n = nodes[i];
+        n.vx += (W / 2 - n.x) * 0.01 * alpha; n.vy += (H / 2 - n.y) * 0.01 * alpha;
+        if (n.fx != null) { n.x = n.fx; n.y = n.fy; n.vx = 0; n.vy = 0; continue; }
+        n.vx *= 0.85; n.vy *= 0.85; n.x += n.vx; n.y += n.vy;
+        var r = radiusOf(n) + 3;
+        n.x = Math.max(r, Math.min(W - r, n.x)); n.y = Math.max(r, Math.min(H - r, n.y));
+      }
+      alpha *= 0.985;
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, W, H);
+      var hl = hover;
+      for (var i = 0; i < edges.length; i++) {
+        var e = edges[i], related = hl && (e.a === hl || e.b === hl), dim = hl && !related;
+        ctx.beginPath(); ctx.moveTo(e.a.x, e.a.y); ctx.lineTo(e.b.x, e.b.y);
+        ctx.strokeStyle = related ? "#f0912d" : "#4a5f76";
+        ctx.globalAlpha = dim ? 0.04 : (related ? 0.9 : 0.10 + e.weight * 0.28);
+        ctx.lineWidth = related ? 2 : 1; ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+      for (i = 0; i < nodes.length; i++) {
+        var n = nodes[i], r = radiusOf(n), isHl = hl === n, isNbr = hl && adj[hl.id][n.id], dim = hl && !isHl && !isNbr;
+        var col = connColor(n.connector);
+        ctx.globalAlpha = dim ? 0.2 : 1;
+        ctx.beginPath(); ctx.arc(n.x, n.y, r, 0, Math.PI * 2);
+        ctx.fillStyle = col; ctx.shadowColor = col; ctx.shadowBlur = isHl ? 20 : (isNbr ? 10 : 5);
+        ctx.fill(); ctx.shadowBlur = 0;
+        ctx.lineWidth = isHl ? 2.5 : 1; ctx.strokeStyle = isHl ? "#fff" : "rgba(16,23,32,0.9)"; ctx.stroke();
+        if ((isHl || (isNbr && r > 7) || r > 12) && !dim) {
+          ctx.font = (isHl ? "700 " : "500 ") + "11px " + "ui-monospace, Menlo, monospace";
+          ctx.fillStyle = isHl ? "#fff" : "#cdd8e4"; ctx.textAlign = "center"; ctx.textBaseline = "top";
+          ctx.fillText(n.label.length > 26 ? n.label.slice(0, 25) + "…" : n.label, n.x, n.y + r + 3);
+        }
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    function loop() { tick(); draw(); if (alpha > 0.004) raf = requestAnimationFrame(loop); else raf = null; }
+    function reheat(v) { alpha = Math.max(alpha, v || 0.5); if (!raf && !reduced) raf = requestAnimationFrame(loop); if (reduced) { for (var i = 0; i < 260; i++) tick(); draw(); } }
+
+    // Coalesce idle redraws (e.g. hover changes) into one vsync-aligned frame.
+    // Drawing synchronously on every pointermove is unsynced to the display and
+    // causes visible flicker; this schedules at most one draw per frame instead.
+    var drawRaf = null;
+    function scheduleDraw() {
+      if (raf || drawRaf) return; // sim loop already drawing, or a draw is queued
+      drawRaf = requestAnimationFrame(function () { drawRaf = null; draw(); });
+    }
+
+    // ---- interaction ----
+    function toLocal(ev) { var rc = canvas.getBoundingClientRect(); return { x: ev.clientX - rc.left, y: ev.clientY - rc.top }; }
+    function pick(p) {
+      for (var i = nodes.length - 1; i >= 0; i--) {
+        var n = nodes[i], r = radiusOf(n) + 6, dx = p.x - n.x, dy = p.y - n.y;
+        if (dx * dx + dy * dy <= r * r) return n;
+      }
+      return null;
+    }
+    canvas.addEventListener("pointerdown", function (ev) {
+      var n = pick(toLocal(ev));
+      if (n) { dragging = n; var p = toLocal(ev); n.fx = p.x; n.fy = p.y; canvas.setPointerCapture(ev.pointerId); reheat(0.4); }
+    });
+    canvas.addEventListener("pointermove", function (ev) {
+      var p = toLocal(ev);
+      if (dragging) { dragging.fx = p.x; dragging.fy = p.y; reheat(0.3); showTip(dragging, p); return; }
+      var n = pick(p);
+      if (n !== hover) { hover = n; scheduleDraw(); }
+      if (n) showTip(n, p); else hideTip();
+    });
+    function endDrag() { if (dragging) { dragging.fx = null; dragging.fy = null; dragging = null; reheat(0.25); } }
+    canvas.addEventListener("pointerup", endDrag);
+    canvas.addEventListener("pointercancel", endDrag);
+    canvas.addEventListener("pointerleave", function () { if (!dragging) { hover = null; hideTip(); scheduleDraw(); } });
+
+    function showTip(n, p) {
+      var d = CONN[n.connector] || CONN.unknown;
+      tooltip.innerHTML = '<div class="name">' + esc(n.label) + '</div>' +
+        '<div class="kind" style="color:' + d.color + '">' + d.label + ' · ' + n.deg + ' links</div>' +
+        '<div class="snip">' + esc(n.snippet || "") + '</div>';
+      tooltip.classList.add("on");
+      var tw = tooltip.offsetWidth, th = tooltip.offsetHeight, x = p.x + 16, y = p.y + 16;
+      if (x + tw > W) x = p.x - tw - 16; if (y + th > H) y = p.y - th - 16;
+      tooltip.style.left = Math.max(4, x) + "px"; tooltip.style.top = Math.max(4, y) + "px";
+    }
+    function hideTip() { tooltip.classList.remove("on"); }
+    function esc(s) { return String(s).replace(/[&<>]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]; }); }
+
+    // ---- wire up ----
+    var thr = document.getElementById("threshold"), thrVal = document.getElementById("threshold-val");
+    thr.addEventListener("input", function () { thrVal.textContent = Number(thr.value).toFixed(2); });
+    document.getElementById("load").addEventListener("click", buildGraph);
+    window.addEventListener("resize", function () { resize(); reheat(0.2); });
+
+    resize();
+    loadSpaces();
+  })();
+  </script>
+</body>
+</html>
